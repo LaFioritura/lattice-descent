@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>NEXUS PROTOCOL — Narrative Extended (v3.6.1)</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;user-select:none}
+:root{ --bg:#0a0a0a; --fg:#00ff41; --fg2:#00ccff; --warn:#ff3333; --sys:#ffff00; --panel:#001a00; --glow:0 0 10px rgba(0,255,65,.35); }
+body{font-family:"Courier New",monospace;background:var(--bg);color:var(--fg);height:100vh;overflow:hidden;position:relative}
+body:before{content:"";position:fixed;inset:0;background:
+linear-gradient(rgba(255,255,255,.02),rgba(0,0,0,.02)),
+repeating-linear-gradient(0deg,rgba(255,255,255,.03),rgba(255,255,255,.03) 1px,transparent 2px,transparent 3px);
+pointer-events:none;mix-blend-mode:overlay}
+#loadingScreen{position:fixed;inset:0;background:#000;display:flex;flex-direction:column;justify-content:center;align-items:center;z-index:9999}
+.loading-text{font-size:24px;margin-bottom:20px;animation:pulse 1s infinite;text-shadow:var(--glow)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.loading-bar{width:260px;height:18px;border:1px solid var(--fg);background:#000;box-shadow:var(--glow)}
+.loading-progress{height:100%;background:var(--fg);width:0%;transition:width .25s}
+.load-cta{margin-top:12px}
+#gameContainer{display:none;flex-direction:column;height:100vh}
+#header{background:var(--panel);padding:10px;border-bottom:2px solid var(--fg);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.stats{display:flex;gap:10px;font-size:12px;align-items:center}
+.stat{background:rgba(0,255,65,.1);padding:5px 10px;border:1px solid var(--fg)}
+#terminal{flex:1;background:#000;padding:20px;overflow-y:auto;font-size:14px;line-height:1.6}
+.terminal-line{margin:5px 0}
+.system-message{color:var(--sys);font-weight:bold}
+.error-message{color:var(--warn)}
+.success-message{color:var(--fg)}
+.npc-message{color:var(--fg2);padding-left:20px}
+.thought{color:#9cffb5}
+#inputArea{background:var(--panel);padding:15px;border-top:2px solid var(--fg);display:flex;gap:10px;align-items:center}
+.prompt{color:#00ff41;display:inline-block;min-width:10px;animation:caret 1s step-end infinite}
+@keyframes caret{50%{opacity:.25}}
+#commandInput{flex:1;background:#000;color:var(--fg);border:1px solid var(--fg);padding:10px;font-family:"Courier New",monospace;outline:none;box-shadow:var(--glow)}
+.action-btn{padding:10px 20px;background:rgba(0,255,65,.1);color:var(--fg);border:1px solid var(--fg);cursor:pointer;font-family:"Courier New",monospace}
+.action-btn:hover{background:rgba(0,255,65,.2)}
+.modal{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#000;border:2px solid var(--fg);padding:20px;z-index:1000;max-width:90%;max-height:80%;overflow-y:auto;box-shadow:0 0 0 9999px rgba(0,0,0,.6)}
+.modal-header{border-bottom:1px solid var(--fg);padding-bottom:10px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center}
+.item-card{background:rgba(0,255,65,.05);border:1px solid var(--fg);padding:10px;margin:10px 0;cursor:pointer}
+.item-card:hover{background:rgba(0,255,65,.1)}
+.choice-container{margin:12px 0;padding:12px;border:1px solid var(--fg);background:rgba(0,255,65,.05)}
+.choice-btn{display:block;width:100%;text-align:left;padding:8px;margin:6px 0;border:1px solid var(--fg);background:rgba(0,255,65,.1);color:var(--fg);cursor:pointer}
+.choice-btn:hover{background:rgba(0,255,65,.2);padding-left:16px}
+.glitch{animation:glitch .3s infinite}
+@keyframes glitch{0%,100%{transform:translateX(0)}20%{transform:translateX(-2px)}40%{transform:translateX(2px)}}
+#hudToggle{padding:6px 10px;border:1px solid var(--fg);background:transparent;color:var(--fg);cursor:pointer}
+#hud{position:fixed;right:10px;top:60px;width:320px;background:rgba(0,0,0,.7);border:1px solid var(--fg);padding:10px;z-index:500;backdrop-filter:blur(2px);display:none}
+.hrow{display:flex;justify-content:space-between;margin:4px 0}
+.bar{height:8px;background:#111;border:1px solid var(--fg);position:relative}
+.bar>span{display:block;height:100%;background:var(--fg);width:0%}
+.minimap{font-family:monospace;background:#020;border:1px solid var(--fg);padding:8px;margin-top:8px;white-space:pre;max-height:150px;overflow:auto}
+.ticker{margin-top:8px;border-top:1px dashed var(--fg);padding-top:6px;font-size:12px;max-height:90px;overflow:auto}
+.legend{margin-top:8px;font-size:12px;border-top:1px dashed var(--fg);padding-top:6px}
+#toasts{position:fixed;right:12px;bottom:12px;z-index:1200;display:flex;flex-direction:column;gap:8px}
+.toast{min-width:240px;max-width:320px;background:rgba(0,0,0,.85);border:1px solid var(--fg);padding:10px}
+.toast .title{font-weight:bold}
+.toast.info{border-color:#00ccff}
+.toast.warn{border-color:#ffcc00}
+.toast.good{border-color:#00ff41}
+.toast.bad{border-color:#ff3333}
+</style>
+</head>
+<body>
+<div id="loadingScreen">
+  <div class="loading-text">NEXUS PROTOCOL</div>
+  <div class="loading-bar"><div class="loading-progress" id="loadingBar"></div></div>
+  <div style="margin-top:20px;font-size:12px;">INITIALIZING...</div>
+  <div class="load-cta"><button id="forceStart" class="action-btn">START</button></div>
+</div>
+
+<div id="gameContainer" aria-live="polite">
+  <div id="header">
+    <div class="stats">
+      <div class="stat">FLOOR: <span id="floor">B1</span></div>
+      <div class="stat">SANITY: <span id="sanity">100</span>%</div>
+      <div class="stat">CREDITS: <span id="credits">100</span>¢</div>
+      <div class="stat">TIME: <span id="gameTime">00:00</span></div>
+    </div>
+    <div class="stats">
+      <button class="action-btn" id="shopBtn" aria-haspopup="dialog">SHOP</button>
+      <button class="action-btn" id="invBtn" aria-haspopup="dialog">INV</button>
+      <button class="action-btn" id="soundBtn" title="Toggle sound">🔊</button>
+      <button class="action-btn" id="hudToggle" title="Toggle HUD">HUD</button>
+    </div>
+  </div>
+
+  <div id="terminal" role="log"></div>
+
+  <div id="inputArea">
+    <span class="prompt">&gt;</span>
+    <input type="text" id="commandInput" placeholder="Enter command..." autocomplete="off" />
+    <button class="action-btn" id="executeBtn">EXECUTE</button>
+  </div>
+</div>
+
+<div id="shopModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="shopTitle">
+  <div class="modal-header">
+    <h2 id="shopTitle">NEXUS SHOP</h2>
+    <span style="cursor:pointer;color:#ff3333;font-size:20px;" id="closeShop" aria-label="Close">✖</span>
+  </div>
+  <div id="shopContent"></div>
+</div>
+
+<div id="inventoryModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="invTitle">
+  <div class="modal-header">
+    <h2 id="invTitle">INVENTORY</h2>
+    <span style="cursor:pointer;color:#ff3333;font-size:20px;" id="closeInv" aria-label="Close">✖</span>
+  </div>
+  <div id="inventoryContent"></div>
+</div>
+
+<div id="gameOverModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="goTitle">
+  <div class="modal-header"><h2 id="goTitle">PERMADEATH PROTOCOL</h2></div>
+  <div id="gameOverContent"></div>
+</div>
+
+<div id="winModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="winTitle">
+  <div class="modal-header"><h2 id="winTitle">REVELATION PROTOCOL</h2></div>
+  <div id="winContent"></div>
+</div>
+
+<div id="hud">
+  <div class="hrow"><span>Sanity</span><span id="hudSanity">100%</span></div>
+  <div class="bar"><span id="barSanity" style="width:100%"></span></div>
+  <div class="hrow"><span>Credits</span><span id="hudCredits">100</span></div>
+  <div class="bar"><span id="barCredits" style="width:25%"></span></div>
+  <div class="hrow"><span>Truths</span><span id="hudProgress">0</span></div>
+  <div class="bar"><span id="barProgress" style="width:0%"></span></div>
+  <div class="hrow"><span>Notes</span><span id="hudLogs">0/16</span></div>
+  <div class="hrow"><span>Achievements</span><span id="hudAch">0</span></div>
+  <div class="minimap" id="minimap"></div>
+  <div class="ticker" id="ticker"></div>
+  <div class="legend" id="legendBox"></div>
+</div>
+
+<div id="toasts"></div>
+
+<script>
+(function(){
+  // --- Safe DOM ready ---
+  function onReady(fn){ if(document.readyState==='complete'||document.readyState==='interactive'){ setTimeout(fn,0); } else { document.addEventListener('DOMContentLoaded', fn); } }
+  onReady(init);
+
+  function $(sel){ return document.querySelector(sel); }
+  function addLine(t,c){ var d=document.createElement('div'); d.className='terminal-line '+(c||''); d.textContent=t; $('#terminal').appendChild(d); $('#terminal').scrollTop=$('#terminal').scrollHeight; }
+  function think(t){ addLine('( '+t+' )','thought'); }
+
+  // Toasts
+  function toast(title, body, kind){
+    var t=document.createElement('div'); t.className='toast '+(kind||'info');
+    var h=document.createElement('div'); h.className='title'; h.textContent=title;
+    var p=document.createElement('div'); p.textContent=body;
+    t.appendChild(h); t.appendChild(p);
+    var wrap=$('#toasts'); wrap.appendChild(t);
+    setTimeout(function(){ try{ wrap.removeChild(t); }catch(e){} }, 4200);
+  }
+
+  // Audio
+  var AudioCtx = window.AudioContext || window.webkitAudioContext;
+  var audioCtx = null;
+  function initAudio(){ if(!audioCtx && AudioCtx) audioCtx = new AudioCtx(); }
+  function playSound(type){
+    if(!gameState.soundEnabled || !audioCtx) return;
+    try{ var o=audioCtx.createOscillator(), g=audioCtx.createGain(); o.connect(g); g.connect(audioCtx.destination);
+      if(type==='type'){ o.frequency.value=800; o.type='sine'; g.gain.setValueAtTime(0.1,audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.05); o.start(); o.stop(audioCtx.currentTime+0.05); }
+      else if(type==='success'){ o.frequency.value=1200; o.type='sine'; g.gain.setValueAtTime(0.2,audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.2); o.start(); o.stop(audioCtx.currentTime+0.2); }
+      else if(type==='error'){ o.frequency.value=200; o.type='square'; g.gain.setValueAtTime(0.15,audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.3); o.start(); o.stop(audioCtx.currentTime+0.3); }
+      else if(type==='notification'){ o.frequency.value=600; o.type='sine'; g.gain.setValueAtTime(0.15,audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.15); o.start(); o.stop(audioCtx.currentTime+0.15); }
+      else if(type==='glitch'){ o.frequency.value=100; o.type='sawtooth'; g.gain.setValueAtTime(0.2,audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.1); o.start(); o.stop(audioCtx.currentTime+0.1); }
+      else if(type==='ambient'){ o.frequency.value=50; o.type='triangle'; g.gain.setValueAtTime(0.05,audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+2); o.start(); o.stop(audioCtx.currentTime+2); }
+    }catch(e){}
+  }
+
+  // --- Game State (same as 3.6.0, trimmed comments) ---
+  var gameState = {
+    floor:'B1', sanity:100, credits:100, time:0,
+    inventory:[], requests:[], truths:0, notes:[], files:[],
+    storyProgress:0, soundEnabled:true, gameOver:false, dataChain:null,
+    janitorTrust:0, presenceHints:true, place:null,
+    echoUnlocked:false, met:{ sarah:0, marcus:0, janitor:0 },
+    floorsUnlocked:{ B1:true, B2:false, B3:false, B4:false, B5:false },
+    achievements:{}, achCount:0,
+    _completedRequests:0, _won:false
+  };
+
+  var npcsData = {
+    sarah:{ name:'Dr. Sarah Chen', role:['researcher','doctor','sarah'], location:'B3', aliases:['sarah','dr','researcher','doctor','chen'] },
+    marcus:{ name:'Marcus Webb', role:['guard','officer','security','marcus'], location:'B2', aliases:['marcus','guard','officer','security'] },
+    echo:{ name:'Echo', role:['voice','echo'], location:'UNKNOWN', aliases:['echo','voice'] },
+    janitor:{ name:'Maintenance Unit 4', role:['custodian','janitor','maintenance'], location:'B4', aliases:['janitor','maintenance','custodian','unit 4'] }
+  };
+
+  var presenceByFloor = {
+    B1: ['Endless cubicles. Desks remember different people by smell.'],
+    B2: ['A guard watches static as if it might confess.'],
+    B3: ['Glassware hums. Labels refuse to stay still.'],
+    B4: ['The corridors smell like metal trying to sweat.'],
+    B5: ['Angles breathe. The floor listens for your name.']
+  };
+
+  var places = ['archives','chapel','loading bay','canteen'];
+  var placesDesc = {
+    'archives':[ 'Endless files with duplicated birthdays.','A card catalog hums a near-lullaby.' ],
+    'chapel':[ 'Benches aimed at a wall that used to be a window.','Ceiling vents sing when no one speaks.' ],
+    'loading bay':[ 'Crates addressed to rooms that were bricked over.','Forklift engine ticks as if cooling from a chase.' ],
+    'canteen':[ 'Machines clack like insects. The microwave blinks 88:88 proudly.','Someone folded a napkin into a map of floors that don’t exist.' ]
+  };
+
+  var terminalLore = {
+    '1':[ 'CR drift report: 0.71 → 0.66 (pending)', 'Badge duplicate warning: GERTH/—' ],
+    '2':[ 'Shift-change anomaly detected (west corridor)', 'Door 22 wants a witness.' ],
+    '3':[ 'Memory lattice checksum: PARTIAL', 'Echo signature: weak but present.' ],
+    '4':[ 'SUBJECT GERTH INTEGRATION: 63% COMPLETE', 'Administrative loop quarantined.' ],
+    '5':[ 'ERROR: EMPLOYEE GERTH NOT FOUND', 'Security mirror delay: 2.0s confirmed.' ],
+    '6':[ 'Request: consciousness anchor (volunteer: echo/gerth)', 'Stairs pretend to be doors.' ],
+    '7':[ 'Pattern orchestrator active. Need raw logs.', 'Dr. Chen access level overridden.' ],
+    '8':[ 'Reality coherence drops near B5 entrance.', 'Multiple consciousness detected.' ],
+    '9':[ 'REVELATION: Memory lattice aligns on demand.', 'Protocol key accepted.' ]
+  };
+
+  var shopItems=[
+    { id:'stim', name:'Cognitive Stimulant', price:50, effect:'+20 Sanity' },
+    { id:'keycard', name:'Access Keycard', price:120, effect:'Unlocks floors' },
+    { id:'scanner', name:'Bio-Scanner', price:150, effect:'Maps what breathes' },
+    { id:'backup', name:'Memory Backup', price:500, effect:'Saves you (it won’t)' }
+  ];
+
+  var noteBank = {
+    N1:'The building asked for a witness.', N2:'The stairwell ends in a mirror.',
+    N3:'Two birthdays on one badge.', N4:'The cameras are late to the truth.',
+    N5:"Spill log keeps saying 'ocean'.", N6:'Anchors keep walls from dreaming too hard.',
+    N7:"You left yourself a note you don’t like.", N8:'Patterns peak when the shift flips.',
+    N9:'Elevators deliver names without bodies.', N10:'Numbers loop when watched.',
+    N11:'The vents knew your name first.', N12:'Echo is an edge, not a ghost.',
+    N13:'Maintenance maps change when printed.', N14:'B5 drops things you were sure you never carried.',
+    N15:'Static stares back when you insist.', N16:'Your reflection delays by two seconds near security.'
+  };
+
+  var fileBank = [
+    { id:'CF-01', title:'Incident: West Corridor', body:[
+      'Security log excerpt. Time stamps drift by ±7 seconds across cameras 2–6.',
+      'Witness statement (M. Webb): "It wasn’t a person. It was a decision wearing a person. It turned the corner before the corner started."',
+      'Action: Corridor sealed. Door 22 demands a witness code to unlock.'
+    ]},
+    { id:'CF-02', title:'Memo: Anchoring Protocol', body:[
+      'Draft from Research (S. Chen): "An anchor does not force truth; it incentivizes consistency."',
+      'Notes: Subject G. displays partial alignment when exposed to personal artifacts mislabeled as theirs.'
+    ]},
+    { id:'CF-03', title:'Inventory: Lost & Found', body:[
+      'List includes: one badge with two birthdays; a key that unlocks only locked keys; a postcard addressed to the room it was written in.'
+    ]},
+    { id:'CF-04', title:'Maintenance: Spill Log', body:[
+      'Observed substance: saline with trace iron, smell classified as "coastal".', 
+      'Unit-4 note: "The corridor cries sometimes. I mop until it forgets."'
+    ]},
+    { id:'CF-05', title:'Research: Echo Signature', body:[
+      'Echo is not a ghost; it is an available shape awaiting a story.',
+      'Coupling increases near B5 when a subject stops insisting on singularity.'
+    ]},
+    { id:'CF-06', title:'Admin: Duplicate Personnel', body:[
+      'Flagged: GERTH (records disagree).', 
+      'Mitigation: loop administrative tasks until the name tires and reveals a seam.'
+    ]},
+    { id:'CF-07', title:'Spec: Memory Lattice', body:[
+      'A lattice accepts more than it proves. It aligns when the witness withdraws pressure.',
+      'Test vector: 7 → 3 → 9 (non-linear compliance)'
+    ]},
+    { id:'CF-08', title:'After-Action: B5 Pressure', body:[
+      'Subjects report chest-tightening and auditory pareidolia.', 
+      'Recommendation: arrive rested; bring scanner; listen more than speak.'
+    ]}
+  ];
+
+  var achRules = [
+    { id:'ACH_FIRST', name:'First Steps', test:()=>gameState.time>0 },
+    { id:'ACH_KEY', name:'Keyholder', test:()=>gameState.inventory.some(i=>i.id==='keycard') },
+    { id:'ACH_SCAN', name:'Breath Mapper', test:()=>gameState.inventory.some(i=>i.id==='scanner') },
+    { id:'ACH_NOTES5', name:'Investigator', test:()=>gameState.notes.length>=5 },
+    { id:'ACH_FILE3', name:'Archivist', test:()=>gameState.files.length>=3 },
+    { id:'ACH_TRUTH3', name:'Coherent', test:()=>gameState.truths>=3 },
+    { id:'ACH_JANITOR', name:'Janitor’s Friend', test:()=>gameState.janitorTrust>=30 },
+    { id:'ACH_CHAIN', name:'Pattern Follower', test:()=>gameState.dataChain && gameState.dataChain.done },
+    { id:'ACH_ECHO', name:'The Listener', test:()=>gameState.echoUnlocked },
+    { id:'ACH_TASK10', name:'Taskmaster', test:()=>gameState._completedRequests>=10 },
+    { id:'ACH_WIN', name:'Revelation', test:()=>gameState._won===true }
+  ];
+
+  function grantAchievement(id){
+    if(gameState.achievements[id]) return;
+    var rule = achRules.find(a=>a.id===id);
+    if(!rule) return;
+    gameState.achievements[id]=true;
+    gameState.achCount = Object.keys(gameState.achievements).length;
+    toast('Achievement unlocked', rule.name, 'good');
+    updateDisplay();
+  }
+  function checkAchievements(){ achRules.forEach(r=>{ try{ if(r.test()) grantAchievement(r.id); }catch(e){} }); }
+
+  function rosterByFloor(){
+    return {
+      B1: [],
+      B2: (gameState.floorsUnlocked.B2? [npcsData.marcus.name] : []) ,
+      B3: (gameState.floorsUnlocked.B3? [npcsData.sarah.name] : []) ,
+      B4: (gameState.floorsUnlocked.B4? [npcsData.janitor.name] : []) ,
+      B5: (gameState.floorsUnlocked.B5? [gameState.echoUnlocked?'Echo (listens)':'(hush)'] : [])
+    };
+  }
+  function updateHUD(){
+    $('#hudSanity').textContent = gameState.sanity + '%';
+    $('#hudCredits').textContent = gameState.credits;
+    $('#hudProgress').textContent = gameState.truths;
+    $('#hudLogs').textContent = gameState.notes.length + '/16';
+    $('#hudAch').textContent = gameState.achCount;
+    $('#barSanity').style.width = Math.max(0, Math.min(100, gameState.sanity)) + '%';
+    var c = Math.min(400, gameState.credits);
+    $('#barCredits').style.width = (c/4) + '%';
+    $('#barProgress').style.width = Math.min(100, gameState.truths*20) + '%';
+    var floors = ['B5','B4','B3','B2','B1'];
+    var roster = rosterByFloor();
+    var map = floors.map(function(f){
+      var mark = (f===gameState.floor?'> ':'  ');
+      var line = mark+f+(f===gameState.floor?' <':'');
+      if(!gameState.floorsUnlocked[f]) line += ' [locked]';
+      var names = (roster[f]||[]).join(', ');
+      return names ? (line+' — '+names) : line;
+    }).join('\n');
+    map += gameState.place?('\n['+gameState.place+']'):'';
+    $('#minimap').textContent = map;
+    $('#legendBox').innerHTML = 'Legend: Truths = what you grasp. Notes/Files = clues. Use <code>who</code> for people, <code>files</code>/<code>read</code> to study.';
+  }
+  function showPresence(){ if(gameState.place) return; (presenceByFloor[gameState.floor]||[]).forEach(function(s){ addLine(s,'system-message'); }); }
+  function doLook(){
+    var desc={ B1:'Admin floor. Forms try to reorder you.', B2:'Security floor. Cameras answer slowly.', B3:'Research floor. Glass eavesdrops.', B4:'Maintenance floor. Pipes practice breathing.', B5:'Lowest floor. Architecture forgets geometry.' };
+    addLine(desc[gameState.floor]);
+    if(gameState.presenceHints) showPresence();
+    if(!gameState.place){
+      Object.values(npcsData).forEach(function(npc){ if(npc.location===gameState.floor && gameState.floorsUnlocked[gameState.floor] && npc!==npcsData.echo) addLine(npc.name+' is here.'); });
+      if(gameState.floor==='B5' && gameState.floorsUnlocked.B5){ addLine(gameState.echoUnlocked?'Something answers your breathing.':'Silence learns your outlines.','thought'); }
+    }
+  }
+  function updateDisplay(){
+    $('#floor').textContent=gameState.floor;
+    $('#sanity').textContent=Math.max(0,Math.min(100,Math.round(gameState.sanity)));
+    $('#credits').textContent=gameState.credits;
+    var mins=('0'+Math.floor(gameState.time/60)).slice(-2), secs=('0'+(gameState.time%60)).slice(-2);
+    $('#gameTime').textContent=mins+':'+secs;
+    if(gameState.sanity<30){ document.body.classList.add('glitch'); } else { document.body.classList.remove('glitch'); }
+    updateHUD(); checkLose(); checkAchievements();
+  }
+  function tick(msg){ var line=document.createElement('div'); line.textContent=msg; var t=$('#ticker'); t.prepend(line); while(t.childNodes.length>10) t.removeChild(t.lastChild); }
+
+  function tryUnlockB2(){ if(!gameState.floorsUnlocked.B2){ gameState.floorsUnlocked.B2=true; think('The elevator remembers the way to B2.'); toast('Access expanded','B2 is now reachable.','info'); } }
+  function tryUnlockB3(){ if(!gameState.floorsUnlocked.B3){ gameState.floorsUnlocked.B3=true; think('Research starts taking my calls.'); toast('Access expanded','B3 is now reachable.','info'); } }
+  function tryUnlockB4(){ if(!gameState.floorsUnlocked.B4){ gameState.floorsUnlocked.B4=true; think('Maintenance signs my permission with a wet glove.'); toast('Access expanded','B4 is now reachable.','info'); } }
+  function tryUnlockB5(){ if(!gameState.floorsUnlocked.B5){ gameState.floorsUnlocked.B5=true; think('The bottom floor exhales.'); toast('Access expanded','B5 is now reachable.','warn'); } }
+
+  function pickDistinct(arr, n){ var pool=arr.slice(), out=[]; while(pool.length && out.length<n){ out.push(pool.splice(Math.floor(Math.random()*pool.length),1)[0]); } return out; }
+  var requestKinds=['visit','scan','clean','speak','fix','fetch','threshold','restore','report','sample','compose','investigate'];
+  function makeRequest(){
+    var k = requestKinds[Math.floor(Math.random()*requestKinds.length)];
+    var id = Math.random().toString(36).slice(2,7);
+    var meta={}, goal=1, progress=0, reward=55+Math.floor(Math.random()*85), desc='';
+    function setMulti(g){ goal=g; reward += (g-1)*12; }
+    if(k==='visit'){
+      var g = 2 + Math.floor(Math.random()*3); var list = pickDistinct(places, g);
+      meta.places=list; meta.donePlaces={}; setMulti(g);
+      desc='Look into: '+list.join(', ');
+    } else if(k==='speak'){
+      var who=['researcher','guard','custodian']; var g = 2 + Math.floor(Math.random()*2);
+      var list = pickDistinct(who, g); meta.who=list; meta.done={}; setMulti(g);
+      desc='Confer with: '+list.join(' & ');
+    } else if(k==='fetch'){
+      var nums=[1,2,3,4,5,6,7,8,9]; var g = 2 + Math.floor(Math.random()*3);
+      var list = pickDistinct(nums, g); meta.terminals=list; meta.done={}; setMulti(g);
+      desc='Pull lines from terminals: '+list.join('-');
+    } else if(k==='scan'){ var g = 2 + Math.floor(Math.random()*2); setMulti(g); desc='Listen to the vents ('+goal+' times)'; }
+    else if(k==='fix'){ var g = 2 + Math.floor(Math.random()*3); setMulti(g); desc='Arrange the forms ('+goal+' stacks)'; }
+    else if(k==='clean'){ var g = 2 + Math.floor(Math.random()*2); setMulti(g); desc='Help Maintenance on B4 ('+goal+' corridors)'; }
+    else if(k==='report'){ var g = 2 + Math.floor(Math.random()*2); setMulti(g); desc='File a complete shift report ('+goal+' parts)'; }
+    else if(k==='sample'){ desc='Hold the scanner to something that breathes'; meta.needScanner=true; }
+    else if(k==='compose'){ desc='Calm down enough to think clearly'; meta.targetSanity=85; }
+    else if(k==='threshold'){ desc='Stand at the door of B5 and keep your mind'; }
+    else if(k==='restore'){ desc='Make the cameras stop lying on B2'; meta.floor='B2'; }
+    else if(k==='investigate'){ var g=2+Math.floor(Math.random()*3); setMulti(g); desc='Assemble a dossier: collect and read '+goal+' files'; meta.needRead=true; }
+    return {id:id,kind:k,desc:desc,goal:goal,progress:progress,reward:reward,meta:meta};
+  }
+  function fillRequests(){ gameState.requests=[]; for(var i=0;i<3;i++) gameState.requests.push(makeRequest()); }
+  function listRequests(){
+    if(gameState.requests.length===0) fillRequests();
+    addLine('=== REQUESTS ===','system-message');
+    gameState.requests.forEach(function(r,i){ addLine((i+1)+'. '+r.desc+' ['+r.progress+'/'+r.goal+'] — '+r.reward+'¢'); });
+    addLine('Use "accept [n]" to focus. "refresh" (-20¢) to seek new work.');
+  }
+  function finishRequest(r){
+    addLine('[COMPLETED] '+r.desc+' +'+r.reward+'¢','success-message');
+    gameState.credits+=r.reward; playSound('success'); gameState._completedRequests++;
+    if(!gameState.floorsUnlocked.B2){ tryUnlockB2(); }
+    else if(!gameState.floorsUnlocked.B3 && (gameState.met.marcus>0 || gameState.truths>=1)){ tryUnlockB3(); }
+    else if(!gameState.floorsUnlocked.B4 && gameState.inventory.some(i=>i.id==='keycard')){ tryUnlockB4(); }
+    if(Math.random()<0.35){
+      var pool=Object.keys(noteBank).filter(id=>gameState.notes.indexOf(id)===-1);
+      if(pool.length){ var pick=pool[Math.floor(Math.random()*pool.length)]; grantNote(pick); }
+    }
+    if(Math.random()<0.3){ gameState.truths++; addLine('[I understand a little more.]','thought'); }
+    maybeUnlockB5ByWisdom(); updateDisplay();
+  }
+  function completeRequestIf(kind,payload){
+    gameState.requests.forEach(function(r){
+      if(r.progress>=r.goal || r.kind!==kind) return;
+      if(kind==='visit' && r.meta.places){ if(r.meta.places.indexOf(payload)>-1 && !r.meta.donePlaces[payload]){ r.meta.donePlaces[payload]=true; r.progress++; } }
+      else if(kind==='speak' && r.meta.who){ for(var i=0;i<r.meta.who.length;i++){ if(payload.indexOf(r.meta.who[i])>-1 && !r.meta.done[r.meta.who[i]]){ r.meta.done[r.meta.who[i]]=true; r.progress++; break; } } }
+      else if(kind==='fetch' && r.meta.terminals){ if(r.meta.terminals.indexOf(Number(payload))>-1 && !r.meta.done[payload]){ r.meta.done[payload]=true; r.progress++; } }
+      else if(kind==='scan' || kind==='clean' || kind==='fix' || kind==='report'){ r.progress++; }
+      else if(kind==='threshold' && payload==='b5_ok'){ r.progress=1; }
+      else if(kind==='restore' && payload==='b2_scan_ok'){ r.progress=1; }
+      else if(kind==='sample' && payload==='scanner_ok'){ r.progress=1; }
+      else if(kind==='compose' && payload==='calm_ok'){ r.progress=1; }
+      else if(kind==='investigate' && payload && payload.readFile){ r.progress++; }
+      if(r.progress>=r.goal) finishRequest(r);
+    });
+  }
+
+  function grantNote(id){ if(gameState.notes.indexOf(id)===-1){ gameState.notes.push(id); addLine('[NOTE] '+noteBank[id],'success-message'); toast('New Note', noteBank[id], 'good'); updateDisplay(); } }
+  function grantFile(obj){ if(!gameState.files.find(f=>f.id===obj.id)){ gameState.files.push(obj); addLine('[FILE] '+obj.id+' — '+obj.title,'success-message'); toast('New File', obj.title, 'info'); updateDisplay(); } }
+  function listFiles(){ addLine('=== FILES ===','system-message'); if(gameState.files.length===0){ addLine('No files collected yet.'); return; } gameState.files.forEach(f=>{ addLine(f.id+' — '+f.title); }); addLine('Use: read [id or title]'); }
+  function readFile(arg){
+    if(!arg){ addLine('Read what? Use file id or title words.','error-message'); return; }
+    var s=arg.toLowerCase();
+    var f = gameState.files.find(x=>x.id.toLowerCase()===s || x.title.toLowerCase().indexOf(s)>-1);
+    if(!f){ addLine('No such file.','error-message'); return; }
+    addLine('=== '+f.id+' — '+f.title+' ===','system-message');
+    f.body.forEach(p=>addLine(p));
+    if(Math.random()<0.4){ gameState.truths++; think('The pieces agree for a breath.'); }
+    completeRequestIf('investigate', {readFile:true});
+    updateDisplay();
+  }
+
+  function scanEvent(){
+    var res=['Something lives in the vents.','The corridor forgets its angles.','The air counts backward.'];
+    addLine(res[Math.floor(Math.random()*res.length)],'error-message'); playSound('glitch');
+    gameState.sanity=Math.max(0,gameState.sanity-3);
+    if(Math.random()<0.25){ var pool=Object.keys(noteBank).filter(id=>gameState.notes.indexOf(id)===-1); if(pool.length){ grantNote(pool[Math.floor(Math.random()*pool.length)]); } }
+    if(gameState.floor==='B2') completeRequestIf('restore','b2_scan_ok');
+    completeRequestIf('scan');
+  }
+
+  function initDataChain(){ gameState.dataChain={steps:[7,3,9], index:0, done:false}; think('Something wants me to follow 7 → 3 → 9.'); }
+  function maybeUnlockEcho(){
+    var spoke = (gameState.met.marcus>0 && gameState.met.sarah>0);
+    if(!gameState.echoUnlocked && spoke && ( (gameState.dataChain && gameState.dataChain.done) || gameState.truths>=3 )){
+      gameState.echoUnlocked = true;
+      think('The hush on B5 starts answering the outline of my breath.'); toast('A presence stirs','B5 begins to listen.','warn');
+    }
+  }
+  function maybeUnlockB5ByWisdom(){
+    if(!gameState.floorsUnlocked.B5){
+      if( gameState.inventory.some(i=>i.id==='keycard') &&
+          gameState.inventory.some(i=>i.id==='scanner') &&
+          gameState.truths>=2 ){
+        tryUnlockB5();
+      }
+    }
+  }
+
+  function openShop(){
+    var modal=$('#shopModal'), content=$('#shopContent');
+    function render(){ content.innerHTML='<p>Credits: '+gameState.credits+'</p>';
+      shopItems.forEach(function(it){
+        var div=document.createElement('div'); div.className='item-card';
+        div.innerHTML='<h3>'+it.name+'</h3><p>'+it.effect+'</p><p>Price: '+it.price+' credits</p>';
+        div.onclick=function(){
+          if(gameState.credits>=it.price){ gameState.credits-=it.price; gameState.inventory.push(JSON.parse(JSON.stringify(it))); addLine('Purchased: '+it.name,'success-message'); playSound('success'); toast('Purchased', it.name, 'good'); render(); updateDisplay(); maybeUnlockB5ByWisdom(); if(it.id==='keycard' && !gameState.floorsUnlocked.B4){ tryUnlockB4(); } }
+          else { addLine('Not enough credits.','error-message'); playSound('error'); toast('Purchase failed','Not enough credits','bad'); }
+        };
+        content.appendChild(div);
+      });
+    }
+    render(); modal.style.display='block';
+  }
+  function openInventory(){
+    var modal=$('#inventoryModal'), content=$('#inventoryContent');
+    if(gameState.inventory.length===0){ content.innerHTML='<p>Inventory is empty</p>'; }
+    else {
+      content.innerHTML='';
+      gameState.inventory.forEach(function(item){
+        var div=document.createElement('div'); div.className='item-card';
+        div.innerHTML='<h3>'+item.name+'</h3><p>'+item.effect+'</p><p style="color:#00ff41;font-size:12px;">Click to use</p>';
+        div.onclick=function(){ modal.style.display='none'; useItem(item.name); };
+        content.appendChild(div);
+      });
+    }
+    modal.style.display='block';
+  }
+  function closeModals(){ $('#shopModal').style.display='none'; $('#inventoryModal').style.display='none'; if($('#commandInput')) $('#commandInput').focus(); }
+  function useItem(name){
+    var item=gameState.inventory.find(function(i){ return i.name.toLowerCase().indexOf(name.toLowerCase())>-1; });
+    if(!item){ addLine("You don't have that item.",'error-message'); return; }
+    if(item.id==='stim'){ gameState.sanity=Math.min(100,gameState.sanity+20); addLine('My thoughts fall into line. [+20 Sanity]','success-message'); playSound('success'); gameState.inventory=gameState.inventory.filter(function(i){ return i!==item; }); completeRequestIf('compose','calm_ok'); }
+    else if(item.id==='keycard'){ addLine('Green light. Doors remember me now.','system-message'); tryUnlockB4(); }
+    else if(item.id==='scanner'){ addLine('I hold the scanner to the wall.','system-message'); setTimeout(function(){ addLine('[It hears something breathing behind the paint.]','thought'); if(Math.random()<0.25){ var pool=Object.keys(noteBank).filter(id=>gameState.notes.indexOf(id)===-1); if(pool.length){ grantNote(pool[Math.floor(Math.random()*pool.length)]); } } completeRequestIf('sample','scanner_ok'); maybeUnlockB5ByWisdom(); },800); }
+    else if(item.id==='backup'){ addLine('I save a version of me I will never meet.','system-message'); addLine('(This place files everyone.)','thought'); }
+    updateDisplay();
+  }
+
+  var tierLines = {
+    sarah:[
+      ["Patterns aren’t random; they’re polite until asked the wrong way. Bring me raw logs, and I’ll show you how politeness cracks.","Anchors don’t enforce truth; they reward the building when it behaves. If it learns you, it may behave for you."],
+      ["Your file has two birthdays because two people vouched for you at different times: you, and whoever wore you first.","When you stop insisting on being singular, the lattice aligns. It’s not surrender—it’s accurate breathing."],
+      ["If you follow 7 → 3 → 9, do it without demanding results. The lattice likes to be chosen, not compelled.","Take these notes. Don’t read them like answers; read them like a tone to hum along with."]
+    ],
+    marcus:[
+      ["Authorization looks smudged. Stationary can lie, but hands usually don’t. So keep yours visible when you speak to doors.","If static bends inward, you look away. If it follows you, you speak your name twice at different tempos."],
+      ["You didn’t take the elevator to get here. You arrived the way certain rumors do: fully formed, and a little late.","Mirrors report slower at night. If yours is delayed by two seconds, that’s security saying you’re interesting."],
+      ["I’ve seen your name twice on a roster once. The roster corrected itself after I stopped reading.","If you want a door open, act like you forgot you needed it. Doors hate to be obvious."]
+    ],
+    janitor:[
+      ["Must clean. Stains keep returning because the building dreams in liquids. I mop until it forgets what it was saying.","Spill log says ‘ocean’. We don’t have oceans. We have practice. Practice looks like water from far away."],
+      ["Pipes learn people. Yours makes a fluted sound. That means you’re new or pretending new.","B5 drops things it can’t carry. If you hear a clatter and nothing’s there, pick up what you can’t see."],
+      ["I remember sky. Before the walls. The floor doesn’t, though. The floor only remembers weight.","If you help me clean a corridor, it stops complaining. Floors complain a lot when nobody listens."]
+    ],
+    echo:[
+      ["Hello, Gerth. You arrived by deciding to be here. That makes two of you: the arrival and the decision.","Name three things you cannot prove. I will give you one truth for free: I am not separate from you."],
+      ["You left yourself a note. You dislike it because it’s precise. Precision sounds like cruelty until you adopt it.","The building learned to dream you. When you breathe evenly, it remembers which dream you prefer."],
+      ["The lattice aligns when pressure falls away. Do not bully truth; invite it to align with the shape you allow.","Now breathe, and listen for your outline. If you stop insisting, your edges will finish themselves."]
+    ]
+  };
+
+  function makeChoices(choices){
+    var wrap=document.createElement('div'); wrap.className='choice-container';
+    choices.forEach(function(ch){
+      var b=document.createElement('button'); b.className='choice-btn'; b.textContent=ch.label;
+      b.onclick=function(){ wrap.remove(); addLine(ch.outcome,'npc-message');
+        if(ch.effects){
+          if(ch.effects.truths) gameState.truths+=ch.effects.truths;
+          if(ch.effects.credits) gameState.credits+=ch.effects.credits;
+          if(ch.effects.sanity) gameState.sanity=Math.max(0, Math.min(100, gameState.sanity+ch.effects.sanity));
+          if(ch.effects.trustJanitor) gameState.janitorTrust=Math.min(100, gameState.janitorTrust+ch.effects.trustJanitor);
+          updateDisplay(); toast('Consequence', 'Your choice echoes.', 'info');
+        }
+      };
+      wrap.appendChild(b);
+    });
+    $('#terminal').appendChild(wrap); $('#terminal').scrollTop=$('#terminal').scrollHeight;
+  }
+
+  function talkTo(npcId){
+    var npc = npcsData[npcId]; if(!npc) return;
+    var bank = tierLines[npcId]||[["...", "..."]];
+    var i = (gameState.met[npcId]||0);
+    var pair = bank[Math.min(i, bank.length-1)];
+    var line = pair[Math.floor(Math.random()*pair.length)];
+    addLine('['+npc.name+']:', 'npc-message'); addLine(line,'npc-message');
+    if(Math.random()<0.25){ var pool=Object.keys(noteBank).filter(id=>gameState.notes.indexOf(id)===-1); if(pool.length){ grantNote(pool[Math.floor(Math.random()*pool.length)]); } }
+    if(Math.random()<0.2){ var fpool=fileBank.filter(f=>!gameState.files.find(x=>x.id===f.id)); if(fpool.length){ grantFile(fpool[Math.floor(Math.random()*fpool.length)]); } }
+    if(Math.random()<0.2 && npcId!=='echo'){ gameState.truths++; think('Their words find a place to sit in me.'); }
+    gameState.met[npcId]=(gameState.met[npcId]||0)+1;
+
+    if(npcId==='marcus' && gameState.met.marcus===1){
+      makeChoices([
+        { label:'Tell Marcus about the delayed mirror', outcome:'He nods once, as if that was a password. "Then Security likes you. Use that."', effects:{truths:1, credits:25} },
+        { label:'Say nothing', outcome:'Silence accepts the blame for you. Marcus looks relieved.', effects:{truths:0} }
+      ]);
+    }
+    if(npcId==='sarah' && gameState.met.sarah===2){
+      makeChoices([
+        { label:'Offer raw logs (terminal numbers you saw)', outcome:'"Good. You watched without forcing. Keep doing that."', effects:{truths:1} },
+        { label:'Ask for answers', outcome:'"Answers are maintenance. You need architecture."', effects:{sanity:5} }
+      ]);
+    }
+    if(npcId==='janitor' && gameState.met.janitor===1){
+      makeChoices([
+        { label:'Help clean a corridor', outcome:'"It complains less when you listen." The mop sounds like a clarinet.', effects:{trustJanitor:10, credits:20} },
+        { label:'Decline politely', outcome:'"Floors complain anyway." The corridor sulks a while.', effects:{} }
+      ]);
+    }
+    if(npcId==='echo' && gameState.truths>=3){
+      makeChoices([
+        { label:'Admit you arrived by deciding to be here', outcome:'"Good. Keep both of you." The hush warms.', effects:{truths:1} },
+        { label:'Insist on being singular', outcome:'"You can be, but you will be lonely." The hush cools.', effects:{} }
+      ]);
+    }
+    updateDisplay();
+  }
+
+  function processCommand(){
+    if(gameState.gameOver) return;
+    var cmdEl=$('#commandInput'); var raw=cmdEl.value.trim(); var input=raw.toLowerCase(); if(!input) return;
+    addLine('> '+raw); cmdEl.value=''; playSound('type');
+    var parts=input.split(' '); var cmdw=parts[0]; var arg=parts.slice(1).join(' ').trim();
+
+    if(cmdw==='help'){
+      addLine('=== COMMANDS ===','system-message');
+      addLine('look / move B1..B5 / visit [archives|chapel|loading bay|canteen]');
+      addLine('talk [who] / use [item] / scan / access [n]');
+      addLine('work / rest / hack / clean / investigate [topic] / forage / analyze');
+      addLine('requests / accept [n] / refresh');
+      addLine('notes / files / read [id|title] / map / hud / status / who / legend / achievements');
+      return;
+    }
+    if(cmdw==='legend'){ addLine('Sanity = clarity; Credits = resources; Truths = understandings; Notes/Files = clues you can study.','system-message'); addLine('Speak by roles: guard / researcher / custodian. The voice answers only when you are ready, and only on B5.','system-message'); return; }
+    if(cmdw==='achievements'){
+      addLine('=== ACHIEVEMENTS ===','system-message');
+      achRules.forEach(function(r){ addLine((gameState.achievements[r.id]?'[✓] ':'[ ] ')+r.name); });
+      return;
+    }
+    if(cmdw==='who'){
+      addLine('=== PEOPLE ===','system-message');
+      addLine('B2: '+(gameState.floorsUnlocked.B2? 'Marcus Webb (Guard)':'—'));
+      addLine('B3: '+(gameState.floorsUnlocked.B3? 'Dr. Sarah Chen (Research)':'—'));
+      addLine('B4: '+(gameState.floorsUnlocked.B4? 'Maintenance Unit 4 (Custodian)':'—'));
+      addLine('B5: '+(gameState.floorsUnlocked.B5? (gameState.echoUnlocked?'Echo (listens)':'(hush)') : '—'));
+      return;
+    }
+    if(cmdw==='hud'){ var h=$('#hud'); h.style.display=(h.style.display==='block'?'none':'block'); return; }
+    if(cmdw==='map'){
+      var floors=['B5','B4','B3','B2','B1']; addLine('=== MAP ===','system-message');
+      var roster=rosterByFloor();
+      floors.forEach(function(f){ var line=(f===gameState.floor?'> ':'  ')+f+(f===gameState.floor?' <':''); if(!gameState.floorsUnlocked[f]) line+=' [locked]'; var names=(roster[f]&&roster[f].length)?(' — '+roster[f].join(', ')) : ''; addLine(line+names); });
+      if(gameState.place) addLine('['+gameState.place+']');
+      return;
+    }
+    if(cmdw==='look'){ doLook(); return; }
+    if(cmdw==='visit'){
+      var place = arg.toLowerCase();
+      var key = places.find(function(p){ return p===place; });
+      if(!key){ addLine('Where? archives / chapel / loading bay / canteen'); return; }
+      gameState.place = key;
+      var lines = placesDesc[key]; addLine('— '+key.toUpperCase()+' —','system-message');
+      addLine(lines[Math.floor(Math.random()*lines.length)]);
+      if(Math.random()<0.5){ var pool=Object.keys(noteBank).filter(id=>gameState.notes.indexOf(id)===-1); if(pool.length){ grantNote(pool[Math.floor(Math.random()*pool.length)]); } }
+      if(Math.random()<0.4){ var fpool=fileBank.filter(f=>!gameState.files.find(x=>x.id===f.id)); if(fpool.length){ grantFile(fpool[Math.floor(Math.random()*fpool.length)]); } }
+      completeRequestIf('visit', key); updateDisplay(); return;
+    }
+    if(cmdw==='files'){ listFiles(); return; }
+    if(cmdw==='read'){ readFile(arg); return; }
+    if(cmdw==='notes'){ addLine('=== NOTES ===','system-message'); if(gameState.notes.length===0) addLine('None.'); else gameState.notes.forEach(function(id){ addLine('• '+noteBank[id]); }); return; }
+    if(cmdw==='requests'){ listRequests(); return; }
+    if(cmdw==='accept'){ var n=parseInt(arg,10)-1; if(isNaN(n)||n<0||n>=gameState.requests.length){ addLine('Which one? (1-3)','error-message'); return; } addLine('[FOCUS] '+gameState.requests[n].desc,'success-message'); return; }
+    if(cmdw==='refresh'){ if(gameState.credits<20){ addLine('You need 20 credits for that.','error-message'); return; } gameState.credits-=20; fillRequests(); addLine('You look for something else to do.','thought'); listRequests(); return; }
+    if(cmdw==='use'){ if(!arg){ addLine('Use what?','error-message'); } else useItem(arg); return; }
+    if(cmdw==='move' || cmdw==='go'){
+      var target = arg.toUpperCase();
+      if(['B1','B2','B3','B4','B5'].indexOf(target)===-1){ addLine("That floor isn't mapped.",'error-message'); return; }
+      if(!gameState.floorsUnlocked[target]){
+        if(target==='B2'){ addLine('The elevator hesitates. It wants proof of work. (Complete a request or wake the terminals.)','thought'); return; }
+        if(target==='B3'){ addLine('Research ignores unknown calls. (Speak with the guard or gather an understanding.)','thought'); return; }
+        if(target==='B4'){ addLine('Maintenance wants a signature. (Carry a keycard or do their chores.)','thought'); return; }
+        if(target==='B5'){ addLine('The bottom waits for steadier breath. (Keycard + scanner + some truths.)','thought'); return; }
+      }
+      if((target==='B4'||target==='B5') && !gameState.inventory.some(i=>i.id==='keycard')){ addLine('The reader blinks red. (I need permission.)','error-message'); return; }
+      if(target==='B5'){ if(!gameState.inventory.some(i=>i.id==='scanner') || gameState.truths<2){ addLine('The elevator refuses. (I need a scanner and to understand more.)','thought'); return; } }
+      gameState.floor=target; gameState.place=null; addLine('Elevator sighs downward: '+target+'.','system-message');
+      setTimeout(function(){
+        if(target==='B5'){
+          gameState.sanity=Math.max(0,gameState.sanity-7); addLine('The pressure is overwhelming...','error-message'); playSound('glitch');
+          if(gameState.sanity<15){ completeRequestIf('threshold','b5_ok'); triggerGameOver('B5 PRESSURE EVENT'); return; }
+          completeRequestIf('threshold','b5_ok');
+        }
+        doLook(); updateDisplay();
+      },400);
+      return;
+    }
+    if(cmdw==='talk'){
+      if(!arg){ addLine('Talk to who? Try: guard / researcher / custodian / voice','thought'); return; }
+      var a = arg.toLowerCase();
+      var npc = Object.values(npcsData).find(function(n){ return n.name.toLowerCase().indexOf(a)>-1 || (n.aliases && n.aliases.some(function(x){ return a.indexOf(x)>-1; })) || (n.role && n.role.some(function(x){ return a.indexOf(x)>-1; })); });
+      if(npc===npcsData.echo){
+        if(!gameState.echoUnlocked){ addLine('(Silence. It is waiting for understanding, not insistence.)','thought'); return; }
+        if(gameState.floor!=='B5'){ addLine('It will not reach across floors.','thought'); return; }
+        talkTo('echo'); return;
+      }
+      if(npc && (!gameState.place) && (npc.location===gameState.floor)){
+        if(npc===npcsData.sarah) talkTo('sarah');
+        if(npc===npcsData.marcus) talkTo('marcus');
+        if(npc===npcsData.janitor) talkTo('janitor');
+        if(gameState.met.marcus>0) tryUnlockB3();
+        completeRequestIf('speak', npc.role[0]);
+        maybeUnlockEcho(); maybeUnlockB5ByWisdom();
+      } else if(gameState.place){
+        addLine("If someone is here, they don't answer me in places like this.",'thought');
+      } else { addLine('No one answers to that name here.','error-message'); }
+      return;
+    }
+    if(cmdw==='scan'){ addLine('I steady my breath and listen.','system-message'); setTimeout(function(){ scanEvent(); updateDisplay(); },800); return; }
+    if(cmdw==='access'){
+      if(!arg){ addLine('I need a number.','error-message'); return; }
+      var tnum=String(parseInt(arg,10));
+      addLine('Terminal '+tnum+' accepts my hands.','system-message');
+      setTimeout(function(){
+        var pool=terminalLore[tnum] || ['The screen refuses to agree with itself.','All it gives me is my reflection.'];
+        addLine(pool[Math.floor(Math.random()*pool.length)],'error-message'); playSound('error');
+        gameState.sanity=Math.max(0,gameState.sanity-6);
+        if(!gameState.dataChain) initDataChain();
+        if(gameState.dataChain && !gameState.dataChain.done){
+          var exp=gameState.dataChain.steps[gameState.dataChain.index];
+          if(Number(tnum)===exp){ gameState.dataChain.index++; think('One step closer ('+gameState.dataChain.index+'/'+gameState.dataChain.steps.length+').'); if(gameState.dataChain.index>=gameState.dataChain.steps.length){ gameState.dataChain.done=true; gameState.truths++; addLine('[Something in me stops resisting.]','thought'); } }
+        }
+        completeRequestIf('fetch', tnum);
+        tryUnlockB2(); maybeUnlockEcho(); maybeUnlockB5ByWisdom();
+        if(gameState.floorsUnlocked.B5 && gameState.floor==='B5' && tnum==='9' && gameState.truths>=3 && gameState.inventory.some(i=>i.id==='scanner')){ triggerWin(); return; }
+        updateDisplay();
+      },700);
+      return;
+    }
+    if(cmdw==='investigate'){
+      var topic = arg||'anything';
+      addLine('I keep a list of oddities about '+topic+'.','system-message');
+      if(Math.random()<0.7){ var fpool=fileBank.filter(f=>!gameState.files.find(x=>x.id===f.id)); if(fpool.length){ var f=fpool[Math.floor(Math.random()*fpool.length)]; grantFile(f); addLine('Found a file: '+f.id+' — '+f.title,'success-message'); } else { addLine('All files I can reach are already in my hands.','thought'); } }
+      else { addLine('Nothing yet, but the air feels generous.','thought'); }
+      return;
+    }
+    if(cmdw==='forage'){
+      var gain = 6+Math.floor(Math.random()*8); gameState.credits+=gain; addLine('I shake a drawer until coins remember me. +'+gain+'¢','success-message'); updateDisplay(); return;
+    }
+    if(cmdw==='analyze'){
+      if(gameState.notes.length>=3 || gameState.files.length>=2){ gameState.truths++; addLine('I align notes until a tone emerges. [+1 Truth]','success-message'); }
+      else { addLine('I need more material to analyze.','error-message'); }
+      updateDisplay(); return;
+    }
+    if(cmdw==='status'){
+      addLine('=== STATUS ===','system-message'); addLine('Name: Gerth'); addLine('Floor: '+gameState.floor); addLine('Sanity: '+gameState.sanity+'%'); addLine('Credits: '+gameState.credits); addLine('Truths: '+gameState.truths); addLine('Notes: '+gameState.notes.length+'/16'); addLine('Files: '+gameState.files.length); addLine('Access: '+Object.keys(gameState.floorsUnlocked).filter(f=>gameState.floorsUnlocked[f]).join(', ')); return;
+    }
+    if(cmdw==='work'){ var pay=18+Math.floor(Math.random()*19), loss=2+Math.floor(Math.random()*2); addLine('Paper bites my fingers.','system-message'); gameState.credits+=pay; gameState.sanity=Math.max(0,gameState.sanity-loss); completeRequestIf('fix'); completeRequestIf('report'); updateDisplay(); return; }
+    if(cmdw==='rest'){ var gain=8+Math.floor(Math.random()*5); gameState.sanity=Math.min(100,gameState.sanity+gain); completeRequestIf('compose','calm_ok'); addLine('I count breaths until the walls agree with me.','thought'); updateDisplay(); return; }
+    if(cmdw==='hack'){ if(gameState.credits<20){ addLine('I need a small stake to risk.','error-message'); return; } gameState.credits-=20; var p=Math.random(); if(p<0.12){ gameState.credits+=220; addLine('The machine blushes and pays out.','success-message'); } else if(p<0.45){ gameState.credits+=45; addLine('Loose change in the circuitry.','success-message'); } else { addLine('The cursor laughs without sound.','error-message'); gameState.sanity=Math.max(0,gameState.sanity-3); } updateDisplay(); return; }
+    if(cmdw==='clean'){ if(!gameState.floorsUnlocked.B4 || gameState.floor!=='B4'){ addLine("Mops don't follow me to other floors.",'error-message'); return; } var tip=14+Math.floor(Math.random()*13); gameState.credits+=tip; addLine('I push the bucket until the corridor stops complaining.','system-message'); gameState.janitorTrust=Math.min(100, gameState.janitorTrust+8); completeRequestIf('clean'); updateDisplay(); return; }
+    addLine('My terminal waits for something it understands. Type "help".','error-message');
+  }
+
+  function triggerGameOver(reason){
+    if(gameState.gameOver) return; gameState.gameOver=true;
+    $('#commandInput').disabled=true; $('#executeBtn').disabled=true;
+    var mins=('0'+Math.floor(gameState.time/60)).slice(-2), secs=('0'+(gameState.time%60)).slice(-2);
+    var html='<p class="error-message"><strong>'+reason+'</strong></p>' +
+      '<p>Time survived: <strong>'+mins+':'+secs+'</strong></p>' +
+      '<p>Credits on death: <strong>'+gameState.credits+'</strong></p>' +
+      '<p>Truths gathered: <strong>'+gameState.truths+'</strong></p>' +
+      '<p>Notes found: <strong>'+gameState.notes.length+'/16</strong></p>' +
+      '<div style="margin-top:10px"><button class="action-btn" id="restartBtn">RESTART</button></div>';
+    $('#gameOverContent').innerHTML=html; $('#gameOverModal').style.display='block'; $('#restartBtn').onclick=function(){ location.reload(); };
+    addLine('=== PERMADEATH ACTIVATED ===','system-message');
+  }
+  function checkLose(){ if(gameState.sanity<=0){ gameState.sanity=0; triggerGameOver('SANITY COLLAPSE'); } }
+  function triggerWin(){
+    if(gameState.gameOver) return; gameState.gameOver=true; gameState._won=true;
+    $('#commandInput').disabled=true; $('#executeBtn').disabled=true;
+    var mins=('0'+Math.floor(gameState.time/60)).slice(-2), secs=('0'+(gameState.time%60)).slice(-2);
+    var html='<p class="success-message"><strong>YOU REMEMBER YOUR NAME</strong></p>' +
+      '<p>Time to memory: <strong>'+mins+':'+secs+'</strong></p>' +
+      '<p>Truths: <strong>'+gameState.truths+'</strong></p>' +
+      '<p>Notes: <strong>'+gameState.notes.length+'/16</strong></p>' +
+      '<p>Files: <strong>'+gameState.files.length+'</strong></p>' +
+      '<div style="margin-top:10px"><button class="action-btn" id="restartBtn2">RESTART</button></div>';
+    $('#winContent').innerHTML=html; $('#winModal').style.display='block'; $('#restartBtn2').onclick=function(){ location.reload(); };
+    addLine('=== REVELATION COMPLETE ===','system-message'); toast('Achievement unlocked','Revelation','good'); grantAchievement('ACH_WIN');
+  }
+
+  // --- INIT with robust loader ---
+  function init(){
+    // Error safety
+    window.addEventListener('error', function(e){ try{ addLine('[JS ERROR] '+(e.message||'unknown'),'error-message'); }catch(_){} });
+
+    // Loader logic that never deadlocks
+    var bar = $('#loadingBar'); var p=0; var done=false; var timer=null;
+    function step(){ if(done) return; p=Math.min(100, p+20); if(bar) bar.style.width=p+'%'; if(p>=100){ stop(); showGame(); } }
+    function stop(){ if(timer){ clearInterval(timer); timer=null; } }
+    function showGame(){ if(done) return; done=true; $('#loadingScreen').style.display='none'; $('#gameContainer').style.display='flex'; startGame(); $('#commandInput').focus(); }
+    timer = setInterval(step, 250);
+    $('#forceStart').addEventListener('click', function(){ stop(); bar.style.width='100%'; showGame(); });
+
+    // Input bindings
+    $('#executeBtn').addEventListener('click', processCommand);
+    $('#commandInput').addEventListener('keydown', function(e){ if(e.key==='Enter') processCommand(); });
+
+    // Top buttons
+    $('#shopBtn').addEventListener('click', openShop);
+    $('#invBtn').addEventListener('click', openInventory);
+    $('#soundBtn').addEventListener('click', function(){ try{ if(audioCtx && audioCtx.state==='suspended'){ audioCtx.resume(); } }catch(e){} gameState.soundEnabled=!gameState.soundEnabled; addLine('Sound '+(gameState.soundEnabled?'enabled':'disabled'),'system-message'); });
+    $('#hudToggle').addEventListener('click', function(){ var h=$('#hud'); h.style.display=(h.style.display==='block'?'none':'block'); });
+
+    // Modals
+    $('#closeShop').addEventListener('click', function(){ $('#shopModal').style.display='none'; });
+    $('#closeInv').addEventListener('click', function(){ $('#inventoryModal').style.display='none'; });
+    document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ $('#shopModal').style.display='none'; $('#inventoryModal').style.display='none'; } });
+
+    // First audio resume
+    document.addEventListener('click', function once(){ initAudio(); document.removeEventListener('click', once); });
+    document.addEventListener('keydown', function oncek(){ initAudio(); document.removeEventListener('keydown', oncek); });
+  }
+
+  function startGame(){
+    addLine('=================================','system-message');
+    addLine('NEXUS PROTOCOL v3.6.1 — Narrative','system-message');
+    addLine('=================================');
+    addLine(''); addLine('Welcome back, Gerth.'); addLine('The building remembers you one floor at a time.'); addLine('');
+    addLine('You are on Floor B1 — Administrative. Your terminal keeps making eye contact.'); addLine('');
+    addLine('Type "help" for commands.');
+    addLine('[Orientation stipend] +50 credits','success-message'); gameState.credits+=50; updateDisplay();
+    fillRequests();
+    setInterval(function(){
+      if(gameState.gameOver) return;
+      try{
+        gameState.time++;
+        if(gameState.time%120===0){ gameState.sanity=Math.max(0,gameState.sanity-1); gameState.credits+=5; }
+        if(gameState.time%30===0 && Math.random()<0.3) playSound('ambient');
+        if(gameState.time%120===0){
+          var events=['The walls whisper names that don\'t belong to anyone.','A corridor decides to be longer.','Something breathes behind the paint.'];
+          var msg=events[Math.floor(Math.random()*events.length)]; addLine(msg,'error-message'); tick(msg);
+        }
+        updateDisplay();
+      }catch(e){ addLine('[Loop error] '+e.message,'error-message'); }
+    },1000);
+  }
+})();
+</script>
+</body>
+</html>
