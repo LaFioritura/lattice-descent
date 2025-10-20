@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<title>NEXUS PROTOCOL — Narrative Extended (v3.6.1)</title>
+<title>NEXUS PROTOCOL — Narrative Extended (v3.7.0)</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;user-select:none}
 :root{ --bg:#0a0a0a; --fg:#00ff41; --fg2:#00ccff; --warn:#ff3333; --sys:#ffff00; --panel:#001a00; --glow:0 0 10px rgba(0,255,65,.35); }
@@ -136,9 +136,9 @@ pointer-events:none;mix-blend-mode:overlay}
 
 <div id="toasts"></div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 (function(){
-  // --- Safe DOM ready ---
   function onReady(fn){ if(document.readyState==='complete'||document.readyState==='interactive'){ setTimeout(fn,0); } else { document.addEventListener('DOMContentLoaded', fn); } }
   onReady(init);
 
@@ -146,7 +146,6 @@ pointer-events:none;mix-blend-mode:overlay}
   function addLine(t,c){ var d=document.createElement('div'); d.className='terminal-line '+(c||''); d.textContent=t; $('#terminal').appendChild(d); $('#terminal').scrollTop=$('#terminal').scrollHeight; }
   function think(t){ addLine('( '+t+' )','thought'); }
 
-  // Toasts
   function toast(title, body, kind){
     var t=document.createElement('div'); t.className='toast '+(kind||'info');
     var h=document.createElement('div'); h.className='title'; h.textContent=title;
@@ -156,7 +155,6 @@ pointer-events:none;mix-blend-mode:overlay}
     setTimeout(function(){ try{ wrap.removeChild(t); }catch(e){} }, 4200);
   }
 
-  // Audio
   var AudioCtx = window.AudioContext || window.webkitAudioContext;
   var audioCtx = null;
   function initAudio(){ if(!audioCtx && AudioCtx) audioCtx = new AudioCtx(); }
@@ -172,7 +170,6 @@ pointer-events:none;mix-blend-mode:overlay}
     }catch(e){}
   }
 
-  // --- Game State (same as 3.6.0, trimmed comments) ---
   var gameState = {
     floor:'B1', sanity:100, credits:100, time:0,
     inventory:[], requests:[], truths:0, notes:[], files:[],
@@ -181,7 +178,7 @@ pointer-events:none;mix-blend-mode:overlay}
     echoUnlocked:false, met:{ sarah:0, marcus:0, janitor:0 },
     floorsUnlocked:{ B1:true, B2:false, B3:false, B4:false, B5:false },
     achievements:{}, achCount:0,
-    _completedRequests:0, _won:false
+    _completedRequests:0, _won:false, _tutorialStep:0, _hintsShown:{}
   };
 
   var npcsData = {
@@ -204,7 +201,7 @@ pointer-events:none;mix-blend-mode:overlay}
     'archives':[ 'Endless files with duplicated birthdays.','A card catalog hums a near-lullaby.' ],
     'chapel':[ 'Benches aimed at a wall that used to be a window.','Ceiling vents sing when no one speaks.' ],
     'loading bay':[ 'Crates addressed to rooms that were bricked over.','Forklift engine ticks as if cooling from a chase.' ],
-    'canteen':[ 'Machines clack like insects. The microwave blinks 88:88 proudly.','Someone folded a napkin into a map of floors that don’t exist.' ]
+    'canteen':[ 'Machines clack like insects. The microwave blinks 88:88 proudly.','Someone folded a napkin into a map of floors that do not exist.' ]
   };
 
   var terminalLore = {
@@ -223,14 +220,14 @@ pointer-events:none;mix-blend-mode:overlay}
     { id:'stim', name:'Cognitive Stimulant', price:50, effect:'+20 Sanity' },
     { id:'keycard', name:'Access Keycard', price:120, effect:'Unlocks floors' },
     { id:'scanner', name:'Bio-Scanner', price:150, effect:'Maps what breathes' },
-    { id:'backup', name:'Memory Backup', price:500, effect:'Saves you (it won’t)' }
+    { id:'backup', name:'Memory Backup', price:500, effect:'Saves you (it will not)' }
   ];
 
   var noteBank = {
     N1:'The building asked for a witness.', N2:'The stairwell ends in a mirror.',
     N3:'Two birthdays on one badge.', N4:'The cameras are late to the truth.',
-    N5:"Spill log keeps saying 'ocean'.", N6:'Anchors keep walls from dreaming too hard.',
-    N7:"You left yourself a note you don’t like.", N8:'Patterns peak when the shift flips.',
+    N5:'Spill log keeps saying ocean.', N6:'Anchors keep walls from dreaming too hard.',
+    N7:'You left yourself a note you do not like.', N8:'Patterns peak when the shift flips.',
     N9:'Elevators deliver names without bodies.', N10:'Numbers loop when watched.',
     N11:'The vents knew your name first.', N12:'Echo is an edge, not a ghost.',
     N13:'Maintenance maps change when printed.', N14:'B5 drops things you were sure you never carried.',
@@ -240,19 +237,19 @@ pointer-events:none;mix-blend-mode:overlay}
   var fileBank = [
     { id:'CF-01', title:'Incident: West Corridor', body:[
       'Security log excerpt. Time stamps drift by ±7 seconds across cameras 2–6.',
-      'Witness statement (M. Webb): "It wasn’t a person. It was a decision wearing a person. It turned the corner before the corner started."',
+      'Witness statement (M. Webb): It was not a person. It was a decision wearing a person. It turned the corner before the corner started.',
       'Action: Corridor sealed. Door 22 demands a witness code to unlock.'
     ]},
     { id:'CF-02', title:'Memo: Anchoring Protocol', body:[
-      'Draft from Research (S. Chen): "An anchor does not force truth; it incentivizes consistency."',
+      'Draft from Research (S. Chen): An anchor does not force truth; it incentivizes consistency.',
       'Notes: Subject G. displays partial alignment when exposed to personal artifacts mislabeled as theirs.'
     ]},
     { id:'CF-03', title:'Inventory: Lost & Found', body:[
       'List includes: one badge with two birthdays; a key that unlocks only locked keys; a postcard addressed to the room it was written in.'
     ]},
     { id:'CF-04', title:'Maintenance: Spill Log', body:[
-      'Observed substance: saline with trace iron, smell classified as "coastal".', 
-      'Unit-4 note: "The corridor cries sometimes. I mop until it forgets."'
+      'Observed substance: saline with trace iron, smell classified as coastal.', 
+      'Unit-4 note: The corridor cries sometimes. I mop until it forgets.'
     ]},
     { id:'CF-05', title:'Research: Echo Signature', body:[
       'Echo is not a ghost; it is an available shape awaiting a story.',
@@ -273,29 +270,29 @@ pointer-events:none;mix-blend-mode:overlay}
   ];
 
   var achRules = [
-    { id:'ACH_FIRST', name:'First Steps', test:()=>gameState.time>0 },
-    { id:'ACH_KEY', name:'Keyholder', test:()=>gameState.inventory.some(i=>i.id==='keycard') },
-    { id:'ACH_SCAN', name:'Breath Mapper', test:()=>gameState.inventory.some(i=>i.id==='scanner') },
-    { id:'ACH_NOTES5', name:'Investigator', test:()=>gameState.notes.length>=5 },
-    { id:'ACH_FILE3', name:'Archivist', test:()=>gameState.files.length>=3 },
-    { id:'ACH_TRUTH3', name:'Coherent', test:()=>gameState.truths>=3 },
-    { id:'ACH_JANITOR', name:'Janitor’s Friend', test:()=>gameState.janitorTrust>=30 },
-    { id:'ACH_CHAIN', name:'Pattern Follower', test:()=>gameState.dataChain && gameState.dataChain.done },
-    { id:'ACH_ECHO', name:'The Listener', test:()=>gameState.echoUnlocked },
-    { id:'ACH_TASK10', name:'Taskmaster', test:()=>gameState._completedRequests>=10 },
-    { id:'ACH_WIN', name:'Revelation', test:()=>gameState._won===true }
+    { id:'ACH_FIRST', name:'First Steps', test:function(){ return gameState.time>0; } },
+    { id:'ACH_KEY', name:'Keyholder', test:function(){ return gameState.inventory.some(function(i){ return i.id==='keycard'; }); } },
+    { id:'ACH_SCAN', name:'Breath Mapper', test:function(){ return gameState.inventory.some(function(i){ return i.id==='scanner'; }); } },
+    { id:'ACH_NOTES5', name:'Investigator', test:function(){ return gameState.notes.length>=5; } },
+    { id:'ACH_FILE3', name:'Archivist', test:function(){ return gameState.files.length>=3; } },
+    { id:'ACH_TRUTH3', name:'Coherent', test:function(){ return gameState.truths>=3; } },
+    { id:'ACH_JANITOR', name:'Janitor\'s Friend', test:function(){ return gameState.janitorTrust>=30; } },
+    { id:'ACH_CHAIN', name:'Pattern Follower', test:function(){ return gameState.dataChain && gameState.dataChain.done; } },
+    { id:'ACH_ECHO', name:'The Listener', test:function(){ return gameState.echoUnlocked; } },
+    { id:'ACH_TASK10', name:'Taskmaster', test:function(){ return gameState._completedRequests>=10; } },
+    { id:'ACH_WIN', name:'Revelation', test:function(){ return gameState._won===true; } }
   ];
 
   function grantAchievement(id){
     if(gameState.achievements[id]) return;
-    var rule = achRules.find(a=>a.id===id);
+    var rule = achRules.find(function(a){ return a.id===id; });
     if(!rule) return;
     gameState.achievements[id]=true;
     gameState.achCount = Object.keys(gameState.achievements).length;
     toast('Achievement unlocked', rule.name, 'good');
     updateDisplay();
   }
-  function checkAchievements(){ achRules.forEach(r=>{ try{ if(r.test()) grantAchievement(r.id); }catch(e){} }); }
+  function checkAchievements(){ achRules.forEach(function(r){ try{ if(r.test()) grantAchievement(r.id); }catch(e){} }); }
 
   function rosterByFloor(){
     return {
@@ -397,9 +394,9 @@ pointer-events:none;mix-blend-mode:overlay}
     gameState.credits+=r.reward; playSound('success'); gameState._completedRequests++;
     if(!gameState.floorsUnlocked.B2){ tryUnlockB2(); }
     else if(!gameState.floorsUnlocked.B3 && (gameState.met.marcus>0 || gameState.truths>=1)){ tryUnlockB3(); }
-    else if(!gameState.floorsUnlocked.B4 && gameState.inventory.some(i=>i.id==='keycard')){ tryUnlockB4(); }
+    else if(!gameState.floorsUnlocked.B4 && gameState.inventory.some(function(i){ return i.id==='keycard'; })){ tryUnlockB4(); }
     if(Math.random()<0.35){
-      var pool=Object.keys(noteBank).filter(id=>gameState.notes.indexOf(id)===-1);
+      var pool=Object.keys(noteBank).filter(function(id){ return gameState.notes.indexOf(id)===-1; });
       if(pool.length){ var pick=pool[Math.floor(Math.random()*pool.length)]; grantNote(pick); }
     }
     if(Math.random()<0.3){ gameState.truths++; addLine('[I understand a little more.]','thought'); }
@@ -422,15 +419,15 @@ pointer-events:none;mix-blend-mode:overlay}
   }
 
   function grantNote(id){ if(gameState.notes.indexOf(id)===-1){ gameState.notes.push(id); addLine('[NOTE] '+noteBank[id],'success-message'); toast('New Note', noteBank[id], 'good'); updateDisplay(); } }
-  function grantFile(obj){ if(!gameState.files.find(f=>f.id===obj.id)){ gameState.files.push(obj); addLine('[FILE] '+obj.id+' — '+obj.title,'success-message'); toast('New File', obj.title, 'info'); updateDisplay(); } }
-  function listFiles(){ addLine('=== FILES ===','system-message'); if(gameState.files.length===0){ addLine('No files collected yet.'); return; } gameState.files.forEach(f=>{ addLine(f.id+' — '+f.title); }); addLine('Use: read [id or title]'); }
+  function grantFile(obj){ if(!gameState.files.find(function(f){ return f.id===obj.id; })){ gameState.files.push(obj); addLine('[FILE] '+obj.id+' — '+obj.title,'success-message'); toast('New File', obj.title, 'info'); updateDisplay(); } }
+  function listFiles(){ addLine('=== FILES ===','system-message'); if(gameState.files.length===0){ addLine('No files collected yet.'); return; } gameState.files.forEach(function(f){ addLine(f.id+' — '+f.title); }); addLine('Use: read [id or title]'); }
   function readFile(arg){
     if(!arg){ addLine('Read what? Use file id or title words.','error-message'); return; }
     var s=arg.toLowerCase();
-    var f = gameState.files.find(x=>x.id.toLowerCase()===s || x.title.toLowerCase().indexOf(s)>-1);
+    var f = gameState.files.find(function(x){ return x.id.toLowerCase()===s || x.title.toLowerCase().indexOf(s)>-1; });
     if(!f){ addLine('No such file.','error-message'); return; }
     addLine('=== '+f.id+' — '+f.title+' ===','system-message');
-    f.body.forEach(p=>addLine(p));
+    f.body.forEach(function(p){ addLine(p); });
     if(Math.random()<0.4){ gameState.truths++; think('The pieces agree for a breath.'); }
     completeRequestIf('investigate', {readFile:true});
     updateDisplay();
@@ -440,7 +437,7 @@ pointer-events:none;mix-blend-mode:overlay}
     var res=['Something lives in the vents.','The corridor forgets its angles.','The air counts backward.'];
     addLine(res[Math.floor(Math.random()*res.length)],'error-message'); playSound('glitch');
     gameState.sanity=Math.max(0,gameState.sanity-3);
-    if(Math.random()<0.25){ var pool=Object.keys(noteBank).filter(id=>gameState.notes.indexOf(id)===-1); if(pool.length){ grantNote(pool[Math.floor(Math.random()*pool.length)]); } }
+    if(Math.random()<0.25){ var pool=Object.keys(noteBank).filter(function(id){ return gameState.notes.indexOf(id)===-1; }); if(pool.length){ grantNote(pool[Math.floor(Math.random()*pool.length)]); } }
     if(gameState.floor==='B2') completeRequestIf('restore','b2_scan_ok');
     completeRequestIf('scan');
   }
@@ -455,8 +452,8 @@ pointer-events:none;mix-blend-mode:overlay}
   }
   function maybeUnlockB5ByWisdom(){
     if(!gameState.floorsUnlocked.B5){
-      if( gameState.inventory.some(i=>i.id==='keycard') &&
-          gameState.inventory.some(i=>i.id==='scanner') &&
+      if( gameState.inventory.some(function(i){ return i.id==='keycard'; }) &&
+          gameState.inventory.some(function(i){ return i.id==='scanner'; }) &&
           gameState.truths>=2 ){
         tryUnlockB5();
       }
@@ -495,33 +492,33 @@ pointer-events:none;mix-blend-mode:overlay}
   function closeModals(){ $('#shopModal').style.display='none'; $('#inventoryModal').style.display='none'; if($('#commandInput')) $('#commandInput').focus(); }
   function useItem(name){
     var item=gameState.inventory.find(function(i){ return i.name.toLowerCase().indexOf(name.toLowerCase())>-1; });
-    if(!item){ addLine("You don't have that item.",'error-message'); return; }
+    if(!item){ addLine("You do not have that item.",'error-message'); return; }
     if(item.id==='stim'){ gameState.sanity=Math.min(100,gameState.sanity+20); addLine('My thoughts fall into line. [+20 Sanity]','success-message'); playSound('success'); gameState.inventory=gameState.inventory.filter(function(i){ return i!==item; }); completeRequestIf('compose','calm_ok'); }
     else if(item.id==='keycard'){ addLine('Green light. Doors remember me now.','system-message'); tryUnlockB4(); }
-    else if(item.id==='scanner'){ addLine('I hold the scanner to the wall.','system-message'); setTimeout(function(){ addLine('[It hears something breathing behind the paint.]','thought'); if(Math.random()<0.25){ var pool=Object.keys(noteBank).filter(id=>gameState.notes.indexOf(id)===-1); if(pool.length){ grantNote(pool[Math.floor(Math.random()*pool.length)]); } } completeRequestIf('sample','scanner_ok'); maybeUnlockB5ByWisdom(); },800); }
+    else if(item.id==='scanner'){ addLine('I hold the scanner to the wall.','system-message'); setTimeout(function(){ addLine('[It hears something breathing behind the paint.]','thought'); if(Math.random()<0.25){ var pool=Object.keys(noteBank).filter(function(id){ return gameState.notes.indexOf(id)===-1; }); if(pool.length){ grantNote(pool[Math.floor(Math.random()*pool.length)]); } } completeRequestIf('sample','scanner_ok'); maybeUnlockB5ByWisdom(); },800); }
     else if(item.id==='backup'){ addLine('I save a version of me I will never meet.','system-message'); addLine('(This place files everyone.)','thought'); }
     updateDisplay();
   }
 
   var tierLines = {
     sarah:[
-      ["Patterns aren’t random; they’re polite until asked the wrong way. Bring me raw logs, and I’ll show you how politeness cracks.","Anchors don’t enforce truth; they reward the building when it behaves. If it learns you, it may behave for you."],
-      ["Your file has two birthdays because two people vouched for you at different times: you, and whoever wore you first.","When you stop insisting on being singular, the lattice aligns. It’s not surrender—it’s accurate breathing."],
-      ["If you follow 7 → 3 → 9, do it without demanding results. The lattice likes to be chosen, not compelled.","Take these notes. Don’t read them like answers; read them like a tone to hum along with."]
+      ["Patterns are not random; they are polite until asked the wrong way. Bring me raw logs, and I will show you how politeness cracks.","Anchors do not enforce truth; they reward the building when it behaves. If it learns you, it may behave for you."],
+      ["Your file has two birthdays because two people vouched for you at different times: you, and whoever wore you first.","When you stop insisting on being singular, the lattice aligns. It is not surrender—it is accurate breathing."],
+      ["If you follow 7 → 3 → 9, do it without demanding results. The lattice likes to be chosen, not compelled.","Take these notes. Do not read them like answers; read them like a tone to hum along with."]
     ],
     marcus:[
-      ["Authorization looks smudged. Stationary can lie, but hands usually don’t. So keep yours visible when you speak to doors.","If static bends inward, you look away. If it follows you, you speak your name twice at different tempos."],
-      ["You didn’t take the elevator to get here. You arrived the way certain rumors do: fully formed, and a little late.","Mirrors report slower at night. If yours is delayed by two seconds, that’s security saying you’re interesting."],
-      ["I’ve seen your name twice on a roster once. The roster corrected itself after I stopped reading.","If you want a door open, act like you forgot you needed it. Doors hate to be obvious."]
+      ["Authorization looks smudged. Stationary can lie, but hands usually do not. So keep yours visible when you speak to doors.","If static bends inward, you look away. If it follows you, you speak your name twice at different tempos."],
+      ["You did not take the elevator to get here. You arrived the way certain rumors do: fully formed, and a little late.","Mirrors report slower at night. If yours is delayed by two seconds, that is security saying you are interesting."],
+      ["I have seen your name twice on a roster once. The roster corrected itself after I stopped reading.","If you want a door open, act like you forgot you needed it. Doors hate to be obvious."]
     ],
     janitor:[
-      ["Must clean. Stains keep returning because the building dreams in liquids. I mop until it forgets what it was saying.","Spill log says ‘ocean’. We don’t have oceans. We have practice. Practice looks like water from far away."],
-      ["Pipes learn people. Yours makes a fluted sound. That means you’re new or pretending new.","B5 drops things it can’t carry. If you hear a clatter and nothing’s there, pick up what you can’t see."],
-      ["I remember sky. Before the walls. The floor doesn’t, though. The floor only remembers weight.","If you help me clean a corridor, it stops complaining. Floors complain a lot when nobody listens."]
+      ["Must clean. Stains keep returning because the building dreams in liquids. I mop until it forgets what it was saying.","Spill log says ocean. We do not have oceans. We have practice. Practice looks like water from far away."],
+      ["Pipes learn people. Yours makes a fluted sound. That means you are new or pretending new.","B5 drops things it cannot carry. If you hear a clatter and nothing is there, pick up what you cannot see."],
+      ["I remember sky. Before the walls. The floor does not, though. The floor only remembers weight.","If you help me clean a corridor, it stops complaining. Floors complain a lot when nobody listens."]
     ],
     echo:[
       ["Hello, Gerth. You arrived by deciding to be here. That makes two of you: the arrival and the decision.","Name three things you cannot prove. I will give you one truth for free: I am not separate from you."],
-      ["You left yourself a note. You dislike it because it’s precise. Precision sounds like cruelty until you adopt it.","The building learned to dream you. When you breathe evenly, it remembers which dream you prefer."],
+      ["You left yourself a note. You dislike it because it is precise. Precision sounds like cruelty until you adopt it.","The building learned to dream you. When you breathe evenly, it remembers which dream you prefer."],
       ["The lattice aligns when pressure falls away. Do not bully truth; invite it to align with the shape you allow.","Now breathe, and listen for your outline. If you stop insisting, your edges will finish themselves."]
     ]
   };
@@ -551,8 +548,8 @@ pointer-events:none;mix-blend-mode:overlay}
     var pair = bank[Math.min(i, bank.length-1)];
     var line = pair[Math.floor(Math.random()*pair.length)];
     addLine('['+npc.name+']:', 'npc-message'); addLine(line,'npc-message');
-    if(Math.random()<0.25){ var pool=Object.keys(noteBank).filter(id=>gameState.notes.indexOf(id)===-1); if(pool.length){ grantNote(pool[Math.floor(Math.random()*pool.length)]); } }
-    if(Math.random()<0.2){ var fpool=fileBank.filter(f=>!gameState.files.find(x=>x.id===f.id)); if(fpool.length){ grantFile(fpool[Math.floor(Math.random()*fpool.length)]); } }
+    if(Math.random()<0.25){ var pool=Object.keys(noteBank).filter(function(id){ return gameState.notes.indexOf(id)===-1; }); if(pool.length){ grantNote(pool[Math.floor(Math.random()*pool.length)]); } }
+    if(Math.random()<0.2){ var fpool=fileBank.filter(function(f){ return !gameState.files.find(function(x){ return x.id===f.id; }); }); if(fpool.length){ grantFile(fpool[Math.floor(Math.random()*fpool.length)]); } }
     if(Math.random()<0.2 && npcId!=='echo'){ gameState.truths++; think('Their words find a place to sit in me.'); }
     gameState.met[npcId]=(gameState.met[npcId]||0)+1;
 
@@ -590,12 +587,33 @@ pointer-events:none;mix-blend-mode:overlay}
     var parts=input.split(' '); var cmdw=parts[0]; var arg=parts.slice(1).join(' ').trim();
 
     if(cmdw==='help'){
-      addLine('=== COMMANDS ===','system-message');
-      addLine('look / move B1..B5 / visit [archives|chapel|loading bay|canteen]');
-      addLine('talk [who] / use [item] / scan / access [n]');
-      addLine('work / rest / hack / clean / investigate [topic] / forage / analyze');
-      addLine('requests / accept [n] / refresh');
-      addLine('notes / files / read [id|title] / map / hud / status / who / legend / achievements');
+      addLine('=== CORE COMMANDS ===','system-message');
+      addLine('look - Examine current floor');
+      addLine('move [B1-B5] - Travel between floors');
+      addLine('talk [guard/researcher/custodian/voice] - Speak with NPCs');
+      addLine('');
+      addLine('=== ACTIONS ===','system-message');
+      addLine('work - Earn credits, lose sanity');
+      addLine('rest - Restore sanity');
+      addLine('scan - Listen to the vents (may find notes)');
+      addLine('access [1-9] - Use terminals (lose sanity, may unlock)');
+      addLine('visit [archives/chapel/loading bay/canteen] - Explore locations');
+      addLine('');
+      addLine('=== MANAGEMENT ===','system-message');
+      addLine('requests - View available tasks');
+      addLine('accept [1-3] - Focus on a specific request');
+      addLine('refresh - Get new requests (-20¢)');
+      addLine('use [item] - Use inventory item');
+      addLine('');
+      addLine('=== INFO ===','system-message');
+      addLine('status - Full character status');
+      addLine('notes - View collected notes');
+      addLine('files - View collected files');
+      addLine('read [id] - Read a specific file');
+      addLine('map - Show floor access');
+      addLine('who - List NPCs by floor');
+      addLine('achievements - View progress');
+      addLine('legend - Game mechanics explanation');
       return;
     }
     if(cmdw==='legend'){ addLine('Sanity = clarity; Credits = resources; Truths = understandings; Notes/Files = clues you can study.','system-message'); addLine('Speak by roles: guard / researcher / custodian. The voice answers only when you are ready, and only on B5.','system-message'); return; }
@@ -628,8 +646,8 @@ pointer-events:none;mix-blend-mode:overlay}
       gameState.place = key;
       var lines = placesDesc[key]; addLine('— '+key.toUpperCase()+' —','system-message');
       addLine(lines[Math.floor(Math.random()*lines.length)]);
-      if(Math.random()<0.5){ var pool=Object.keys(noteBank).filter(id=>gameState.notes.indexOf(id)===-1); if(pool.length){ grantNote(pool[Math.floor(Math.random()*pool.length)]); } }
-      if(Math.random()<0.4){ var fpool=fileBank.filter(f=>!gameState.files.find(x=>x.id===f.id)); if(fpool.length){ grantFile(fpool[Math.floor(Math.random()*fpool.length)]); } }
+      if(Math.random()<0.5){ var pool=Object.keys(noteBank).filter(function(id){ return gameState.notes.indexOf(id)===-1; }); if(pool.length){ grantNote(pool[Math.floor(Math.random()*pool.length)]); } }
+      if(Math.random()<0.4){ var fpool=fileBank.filter(function(f){ return !gameState.files.find(function(x){ return x.id===f.id; }); }); if(fpool.length){ grantFile(fpool[Math.floor(Math.random()*fpool.length)]); } }
       completeRequestIf('visit', key); updateDisplay(); return;
     }
     if(cmdw==='files'){ listFiles(); return; }
@@ -648,8 +666,8 @@ pointer-events:none;mix-blend-mode:overlay}
         if(target==='B4'){ addLine('Maintenance wants a signature. (Carry a keycard or do their chores.)','thought'); return; }
         if(target==='B5'){ addLine('The bottom waits for steadier breath. (Keycard + scanner + some truths.)','thought'); return; }
       }
-      if((target==='B4'||target==='B5') && !gameState.inventory.some(i=>i.id==='keycard')){ addLine('The reader blinks red. (I need permission.)','error-message'); return; }
-      if(target==='B5'){ if(!gameState.inventory.some(i=>i.id==='scanner') || gameState.truths<2){ addLine('The elevator refuses. (I need a scanner and to understand more.)','thought'); return; } }
+      if((target==='B4'||target==='B5') && !gameState.inventory.some(function(i){ return i.id==='keycard'; })){ addLine('The reader blinks red. (I need permission.)','error-message'); return; }
+      if(target==='B5'){ if(!gameState.inventory.some(function(i){ return i.id==='scanner'; }) || gameState.truths<2){ addLine('The elevator refuses. (I need a scanner and to understand more.)','thought'); return; } }
       gameState.floor=target; gameState.place=null; addLine('Elevator sighs downward: '+target+'.','system-message');
       setTimeout(function(){
         if(target==='B5'){
@@ -678,7 +696,7 @@ pointer-events:none;mix-blend-mode:overlay}
         completeRequestIf('speak', npc.role[0]);
         maybeUnlockEcho(); maybeUnlockB5ByWisdom();
       } else if(gameState.place){
-        addLine("If someone is here, they don't answer me in places like this.",'thought');
+        addLine("If someone is here, they do not answer me in places like this.",'thought');
       } else { addLine('No one answers to that name here.','error-message'); }
       return;
     }
@@ -698,7 +716,7 @@ pointer-events:none;mix-blend-mode:overlay}
         }
         completeRequestIf('fetch', tnum);
         tryUnlockB2(); maybeUnlockEcho(); maybeUnlockB5ByWisdom();
-        if(gameState.floorsUnlocked.B5 && gameState.floor==='B5' && tnum==='9' && gameState.truths>=3 && gameState.inventory.some(i=>i.id==='scanner')){ triggerWin(); return; }
+        if(gameState.floorsUnlocked.B5 && gameState.floor==='B5' && tnum==='9' && gameState.truths>=3 && gameState.inventory.some(function(i){ return i.id==='scanner'; })){ triggerWin(); return; }
         updateDisplay();
       },700);
       return;
@@ -706,7 +724,7 @@ pointer-events:none;mix-blend-mode:overlay}
     if(cmdw==='investigate'){
       var topic = arg||'anything';
       addLine('I keep a list of oddities about '+topic+'.','system-message');
-      if(Math.random()<0.7){ var fpool=fileBank.filter(f=>!gameState.files.find(x=>x.id===f.id)); if(fpool.length){ var f=fpool[Math.floor(Math.random()*fpool.length)]; grantFile(f); addLine('Found a file: '+f.id+' — '+f.title,'success-message'); } else { addLine('All files I can reach are already in my hands.','thought'); } }
+      if(Math.random()<0.7){ var fpool=fileBank.filter(function(f){ return !gameState.files.find(function(x){ return x.id===f.id; }); }); if(fpool.length){ var f=fpool[Math.floor(Math.random()*fpool.length)]; grantFile(f); addLine('Found a file: '+f.id+' — '+f.title,'success-message'); } else { addLine('All files I can reach are already in my hands.','thought'); } }
       else { addLine('Nothing yet, but the air feels generous.','thought'); }
       return;
     }
@@ -719,12 +737,12 @@ pointer-events:none;mix-blend-mode:overlay}
       updateDisplay(); return;
     }
     if(cmdw==='status'){
-      addLine('=== STATUS ===','system-message'); addLine('Name: Gerth'); addLine('Floor: '+gameState.floor); addLine('Sanity: '+gameState.sanity+'%'); addLine('Credits: '+gameState.credits); addLine('Truths: '+gameState.truths); addLine('Notes: '+gameState.notes.length+'/16'); addLine('Files: '+gameState.files.length); addLine('Access: '+Object.keys(gameState.floorsUnlocked).filter(f=>gameState.floorsUnlocked[f]).join(', ')); return;
+      addLine('=== STATUS ===','system-message'); addLine('Name: Gerth'); addLine('Floor: '+gameState.floor); addLine('Sanity: '+gameState.sanity+'%'); addLine('Credits: '+gameState.credits); addLine('Truths: '+gameState.truths); addLine('Notes: '+gameState.notes.length+'/16'); addLine('Files: '+gameState.files.length); addLine('Access: '+Object.keys(gameState.floorsUnlocked).filter(function(f){ return gameState.floorsUnlocked[f]; }).join(', ')); return;
     }
     if(cmdw==='work'){ var pay=18+Math.floor(Math.random()*19), loss=2+Math.floor(Math.random()*2); addLine('Paper bites my fingers.','system-message'); gameState.credits+=pay; gameState.sanity=Math.max(0,gameState.sanity-loss); completeRequestIf('fix'); completeRequestIf('report'); updateDisplay(); return; }
     if(cmdw==='rest'){ var gain=8+Math.floor(Math.random()*5); gameState.sanity=Math.min(100,gameState.sanity+gain); completeRequestIf('compose','calm_ok'); addLine('I count breaths until the walls agree with me.','thought'); updateDisplay(); return; }
     if(cmdw==='hack'){ if(gameState.credits<20){ addLine('I need a small stake to risk.','error-message'); return; } gameState.credits-=20; var p=Math.random(); if(p<0.12){ gameState.credits+=220; addLine('The machine blushes and pays out.','success-message'); } else if(p<0.45){ gameState.credits+=45; addLine('Loose change in the circuitry.','success-message'); } else { addLine('The cursor laughs without sound.','error-message'); gameState.sanity=Math.max(0,gameState.sanity-3); } updateDisplay(); return; }
-    if(cmdw==='clean'){ if(!gameState.floorsUnlocked.B4 || gameState.floor!=='B4'){ addLine("Mops don't follow me to other floors.",'error-message'); return; } var tip=14+Math.floor(Math.random()*13); gameState.credits+=tip; addLine('I push the bucket until the corridor stops complaining.','system-message'); gameState.janitorTrust=Math.min(100, gameState.janitorTrust+8); completeRequestIf('clean'); updateDisplay(); return; }
+    if(cmdw==='clean'){ if(!gameState.floorsUnlocked.B4 || gameState.floor!=='B4'){ addLine("Mops do not follow me to other floors.",'error-message'); return; } var tip=14+Math.floor(Math.random()*13); gameState.credits+=tip; addLine('I push the bucket until the corridor stops complaining.','system-message'); gameState.janitorTrust=Math.min(100, gameState.janitorTrust+8); completeRequestIf('clean'); updateDisplay(); return; }
     addLine('My terminal waits for something it understands. Type "help".','error-message');
   }
 
@@ -756,12 +774,9 @@ pointer-events:none;mix-blend-mode:overlay}
     addLine('=== REVELATION COMPLETE ===','system-message'); toast('Achievement unlocked','Revelation','good'); grantAchievement('ACH_WIN');
   }
 
-  // --- INIT with robust loader ---
   function init(){
-    // Error safety
     window.addEventListener('error', function(e){ try{ addLine('[JS ERROR] '+(e.message||'unknown'),'error-message'); }catch(_){} });
 
-    // Loader logic that never deadlocks
     var bar = $('#loadingBar'); var p=0; var done=false; var timer=null;
     function step(){ if(done) return; p=Math.min(100, p+20); if(bar) bar.style.width=p+'%'; if(p>=100){ stop(); showGame(); } }
     function stop(){ if(timer){ clearInterval(timer); timer=null; } }
@@ -769,22 +784,18 @@ pointer-events:none;mix-blend-mode:overlay}
     timer = setInterval(step, 250);
     $('#forceStart').addEventListener('click', function(){ stop(); bar.style.width='100%'; showGame(); });
 
-    // Input bindings
     $('#executeBtn').addEventListener('click', processCommand);
     $('#commandInput').addEventListener('keydown', function(e){ if(e.key==='Enter') processCommand(); });
 
-    // Top buttons
     $('#shopBtn').addEventListener('click', openShop);
     $('#invBtn').addEventListener('click', openInventory);
     $('#soundBtn').addEventListener('click', function(){ try{ if(audioCtx && audioCtx.state==='suspended'){ audioCtx.resume(); } }catch(e){} gameState.soundEnabled=!gameState.soundEnabled; addLine('Sound '+(gameState.soundEnabled?'enabled':'disabled'),'system-message'); });
     $('#hudToggle').addEventListener('click', function(){ var h=$('#hud'); h.style.display=(h.style.display==='block'?'none':'block'); });
 
-    // Modals
     $('#closeShop').addEventListener('click', function(){ $('#shopModal').style.display='none'; });
     $('#closeInv').addEventListener('click', function(){ $('#inventoryModal').style.display='none'; });
     document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ $('#shopModal').style.display='none'; $('#inventoryModal').style.display='none'; } });
 
-    // First audio resume
     document.addEventListener('click', function once(){ initAudio(); document.removeEventListener('click', once); });
     document.addEventListener('keydown', function oncek(){ initAudio(); document.removeEventListener('keydown', oncek); });
   }
@@ -805,7 +816,7 @@ pointer-events:none;mix-blend-mode:overlay}
         if(gameState.time%120===0){ gameState.sanity=Math.max(0,gameState.sanity-1); gameState.credits+=5; }
         if(gameState.time%30===0 && Math.random()<0.3) playSound('ambient');
         if(gameState.time%120===0){
-          var events=['The walls whisper names that don\'t belong to anyone.','A corridor decides to be longer.','Something breathes behind the paint.'];
+          var events=['The walls whisper names that do not belong to anyone.','A corridor decides to be longer.','Something breathes behind the paint.'];
           var msg=events[Math.floor(Math.random()*events.length)]; addLine(msg,'error-message'); tick(msg);
         }
         updateDisplay();
