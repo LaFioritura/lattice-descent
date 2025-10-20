@@ -294,36 +294,36 @@ body.glitch-mode #terminal{
     <div class="stats">
       <div class="stat floor-indicator">
         <span class="led green pulse"></span>
-        <span>FLOOR:</span> 
+        <span>LEVEL:</span> 
         <span id="floor" class="bracket">[B1]</span>
       </div>
       <div class="stat sanity-indicator">
         <span class="led green" id="sanityLed"></span>
-        <span>SANITY:</span> 
+        <span>COHERENCE:</span> 
         <span id="sanity">100</span>%
         <span class="status-symbol" id="sanitySymbol">●</span>
       </div>
       <div class="stat">
         <span class="symbol">¢</span>
-        <span>CREDITS:</span> 
+        <span>CLEARANCE:</span> 
         <span id="credits">100</span>
       </div>
       <div class="stat">
         <span class="symbol">⏱</span>
-        <span>TIME:</span> 
+        <span>CYCLE:</span> 
         <span id="gameTime">00:00</span>
       </div>
     </div>
     <div class="stats">
       <button class="action-btn" id="shopBtn" aria-haspopup="dialog">
-        <span class="symbol">🛒</span> SHOP
+        <span class="symbol">📋</span> REQUISITION
       </button>
       <button class="action-btn" id="invBtn" aria-haspopup="dialog">
-        <span class="symbol">📦</span> INV
+        <span class="symbol">📦</span> EFFECTS
       </button>
       <button class="action-btn" id="soundBtn" title="Toggle sound">🔊</button>
-      <button class="action-btn" id="hudToggle" title="Toggle HUD">
-        <span class="symbol">📊</span> HUD
+      <button class="action-btn" id="hudToggle" title="Toggle monitor">
+        <span class="symbol">📊</span> MONITOR
       </button>
     </div>
   </div>
@@ -332,14 +332,14 @@ body.glitch-mode #terminal{
 
   <div id="inputArea">
     <span class="prompt">&gt;</span>
-    <input type="text" id="commandInput" placeholder="Enter command..." autocomplete="off" />
-    <button class="action-btn" id="executeBtn">EXECUTE</button>
+    <input type="text" id="commandInput" placeholder="Enter directive..." autocomplete="off" />
+    <button class="action-btn" id="executeBtn">COMMIT</button>
   </div>
 </div>
 
 <div id="shopModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="shopTitle">
   <div class="modal-header">
-    <h2 id="shopTitle">NEXUS SHOP</h2>
+    <h2 id="shopTitle">REQUISITION TERMINAL</h2>
     <span style="cursor:pointer;color:#ff3333;font-size:20px;" id="closeShop" aria-label="Close">✖</span>
   </div>
   <div id="shopContent"></div>
@@ -347,7 +347,7 @@ body.glitch-mode #terminal{
 
 <div id="inventoryModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="invTitle">
   <div class="modal-header">
-    <h2 id="invTitle">INVENTORY</h2>
+    <h2 id="invTitle">PERSONAL EFFECTS</h2>
     <span style="cursor:pointer;color:#ff3333;font-size:20px;" id="closeInv" aria-label="Close">✖</span>
   </div>
   <div id="inventoryContent"></div>
@@ -677,8 +677,8 @@ body.glitch-mode #terminal{
   };
 
   var shopItems=[
-    { id:'stim', name:'Cognitive Stimulant', price:50, effect:'+20 Sanity' },
-    { id:'keycard', name:'Access Keycard', price:120, effect:'Unlocks floors' },
+    { id:'stim', name:'Cognitive Stimulant', price:50, effect:'+20 Coherence' },
+    { id:'keycard', name:'Access Keycard', price:120, effect:'Unlocks levels' },
     { id:'scanner', name:'Bio-Scanner', price:150, effect:'Maps what breathes' },
     { id:'backup', name:'Memory Backup', price:500, effect:'Saves you (it will not)' }
   ];
@@ -749,8 +749,8 @@ body.glitch-mode #terminal{
     if(!rule) return;
     gameState.achievements[id]=true;
     gameState.achCount = Object.keys(gameState.achievements).length;
-    toast('Achievement unlocked', '🏆 '+rule.name, 'good');
-    addLine('[ACHIEVEMENT] 🏆 '+rule.name,'success-message');
+    toast('Recognition granted', '◆ '+rule.name, 'good');
+    addLine('[RECOGNITION] ◆ '+rule.name,'success-message');
     playSound('success');
     updateDisplay();
   }
@@ -790,12 +790,23 @@ body.glitch-mode #terminal{
   }
   function showPresence(){ if(gameState.place) return; (presenceByFloor[gameState.floor]||[]).forEach(function(s){ addLine(s,'system-message'); }); }
   function doLook(){
-    var desc={ B1:'Admin floor. Forms try to reorder you.', B2:'Security floor. Cameras answer slowly.', B3:'Research floor. Glass eavesdrops.', B4:'Maintenance floor. Pipes practice breathing.', B5:'Lowest floor. Architecture forgets geometry.' };
+    var desc={ 
+      B1:'Admin level. Forms try to reorder you. Filing cabinets breathe in shifts.', 
+      B2:'Security level. Cameras answer slowly. Mirrors remember you twice.', 
+      B3:'Research level. Glass eavesdrops. Samples watch back.', 
+      B4:'Maintenance level. Pipes practice breathing. Mops know your rhythm.', 
+      B5:'Lowest level. Architecture forgets geometry. Pressure feels like recognition.' 
+    };
     addLine(desc[gameState.floor]);
     if(gameState.presenceHints) showPresence();
     if(!gameState.place){
-      Object.values(npcsData).forEach(function(npc){ if(npc.location===gameState.floor && gameState.floorsUnlocked[gameState.floor] && npc!==npcsData.echo) addLine(npc.name+' is here.'); });
-      if(gameState.floor==='B5' && gameState.floorsUnlocked.B5){ addLine(gameState.echoUnlocked?'Something answers your breathing.':'Silence learns your outlines.','thought'); }
+      Object.values(npcsData).forEach(function(npc){ 
+        if(npc.location===gameState.floor && gameState.floorsUnlocked[gameState.floor] && npc!==npcsData.echo) 
+          addLine(npc.name+' is here.','success-message'); 
+      });
+      if(gameState.floor==='B5' && gameState.floorsUnlocked.B5){ 
+        addLine(gameState.echoUnlocked?'Something answers your breathing.':'Silence learns your outlines.','thought'); 
+      }
     }
   }
   function updateDisplay(){
@@ -958,7 +969,7 @@ body.glitch-mode #terminal{
     
     if(item.id==='stim'){ 
       gameState.sanity=Math.min(100,gameState.sanity+20); 
-      addLine('My thoughts fall into line. [+20 Sanity]','success-message'); 
+      addLine('My thoughts fall into line. [+20 Coherence]','success-message'); 
       playSound('success'); 
       createParticles(15, $('#sanity').parentElement);
       gameState.inventory=gameState.inventory.filter(function(i){ return i!==item; }); 
@@ -1114,8 +1125,8 @@ body.glitch-mode #terminal{
     }
     if(cmdw==='legend'){ addLine('Sanity = clarity; Credits = resources; Truths = understandings; Notes/Files = clues you can study.','system-message'); addLine('Speak by roles: guard / researcher / custodian. The voice answers only when you are ready, and only on B5.','system-message'); return; }
     if(cmdw==='achievements'){
-      addLine('=== ACHIEVEMENTS ===','system-message');
-      achRules.forEach(function(r){ addLine((gameState.achievements[r.id]?'[✓] ':'[ ] ')+r.name); });
+      addLine('=== RECOGNITIONS ===','system-message');
+      achRules.forEach(function(r){ addLine((gameState.achievements[r.id]?'[◆] ':'[ ] ')+r.name); });
       return;
     }
     if(cmdw==='who'){
@@ -1151,7 +1162,7 @@ body.glitch-mode #terminal{
     if(cmdw==='notes'){ addLine('=== NOTES ===','system-message'); if(gameState.notes.length===0) addLine('None.'); else gameState.notes.forEach(function(id){ addLine('• '+noteBank[id]); }); return; }
     if(cmdw==='requests'){ listRequests(); return; }
     if(cmdw==='accept'){ var n=parseInt(arg,10)-1; if(isNaN(n)||n<0||n>=gameState.requests.length){ addLine('Which one? (1-3)','error-message'); return; } addLine('[FOCUS] '+gameState.requests[n].desc,'success-message'); return; }
-    if(cmdw==='refresh'){ if(gameState.credits<20){ addLine('You need 20 credits for that.','error-message'); return; } gameState.credits-=20; fillRequests(); addLine('You look for something else to do.','thought'); listRequests(); return; }
+    if(cmdw==='refresh'){ if(gameState.credits<20){ addLine('You need 20 clearance for that.','error-message'); return; } gameState.credits-=20; fillRequests(); addLine('You seek alternative directives.','thought'); listRequests(); return; }
     if(cmdw==='use'){ if(!arg){ addLine('Use what?','error-message'); } else useItem(arg); return; }
     if(cmdw==='move' || cmdw==='go'){
       var target = arg.toUpperCase();
