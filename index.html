@@ -6,12 +6,63 @@
 <title>NEXUS PROTOCOL — Narrative Extended (v3.7.0)</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;user-select:none}
-:root{ --bg:#0a0a0a; --fg:#00ff41; --fg2:#00ccff; --warn:#ff3333; --sys:#ffff00; --panel:#001a00; --glow:0 0 10px rgba(0,255,65,.35); }
+:root{ --bg:#0a0a0a; --fg:#00ff41; --fg2:#00ccff; --warn:#ff3333; --sys:#ffff00; --panel:#001a00; --glow:0 0 10px rgba(0,255,65,.35); --glow-warn:0 0 15px rgba(255,51,51,.6); --glow-sys:0 0 12px rgba(255,255,0,.4); }
 body{font-family:"Courier New",monospace;background:var(--bg);color:var(--fg);height:100vh;overflow:hidden;position:relative}
 body:before{content:"";position:fixed;inset:0;background:
 linear-gradient(rgba(255,255,255,.02),rgba(0,0,0,.02)),
 repeating-linear-gradient(0deg,rgba(255,255,255,.03),rgba(255,255,255,.03) 1px,transparent 2px,transparent 3px);
 pointer-events:none;mix-blend-mode:overlay}
+.led{
+  display:inline-block;
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  margin:0 4px;
+  position:relative;
+  vertical-align:middle;
+}
+.led.green{background:#00ff41;box-shadow:0 0 8px #00ff41,inset 0 0 3px #fff}
+.led.red{background:#ff3333;box-shadow:0 0 8px #ff3333,inset 0 0 3px #fff}
+.led.yellow{background:#ffff00;box-shadow:0 0 8px #ffff00,inset 0 0 3px #fff}
+.led.blue{background:#00ccff;box-shadow:0 0 8px #00ccff,inset 0 0 3px #fff}
+.led.off{background:#333;box-shadow:none}
+.led.pulse{animation:pulse-led 1.5s infinite}
+@keyframes pulse-led{0%,100%{opacity:1}50%{opacity:.3}}
+.symbol{
+  display:inline-block;
+  font-size:16px;
+  margin:0 4px;
+  vertical-align:middle;
+  text-shadow:0 0 6px currentColor;
+}
+.symbol.spin{animation:spin 3s linear infinite}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.floor-indicator{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:4px 8px;
+  border:1px solid var(--fg);
+  background:rgba(0,255,65,.05);
+}
+.sanity-indicator{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+}
+.status-symbol{
+  font-size:14px;
+  margin-left:4px;
+}
+.terminal-prefix{
+  color:var(--fg);
+  margin-right:4px;
+  text-shadow:var(--glow);
+}
+.bracket{
+  color:var(--fg2);
+  font-weight:bold;
+}
 #loadingScreen{position:fixed;inset:0;background:#000;display:flex;flex-direction:column;justify-content:center;align-items:center;z-index:9999}
 .loading-text{font-size:24px;margin-bottom:20px;animation:pulse 1s infinite;text-shadow:var(--glow)}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
@@ -72,16 +123,39 @@ pointer-events:none;mix-blend-mode:overlay}
 <div id="gameContainer" aria-live="polite">
   <div id="header">
     <div class="stats">
-      <div class="stat">FLOOR: <span id="floor">B1</span></div>
-      <div class="stat">SANITY: <span id="sanity">100</span>%</div>
-      <div class="stat">CREDITS: <span id="credits">100</span>¢</div>
-      <div class="stat">TIME: <span id="gameTime">00:00</span></div>
+      <div class="stat floor-indicator">
+        <span class="led green pulse"></span>
+        <span>FLOOR:</span> 
+        <span id="floor" class="bracket">[B1]</span>
+      </div>
+      <div class="stat sanity-indicator">
+        <span class="led green" id="sanityLed"></span>
+        <span>SANITY:</span> 
+        <span id="sanity">100</span>%
+        <span class="status-symbol" id="sanitySymbol">●</span>
+      </div>
+      <div class="stat">
+        <span class="symbol">¢</span>
+        <span>CREDITS:</span> 
+        <span id="credits">100</span>
+      </div>
+      <div class="stat">
+        <span class="symbol">⏱</span>
+        <span>TIME:</span> 
+        <span id="gameTime">00:00</span>
+      </div>
     </div>
     <div class="stats">
-      <button class="action-btn" id="shopBtn" aria-haspopup="dialog">SHOP</button>
-      <button class="action-btn" id="invBtn" aria-haspopup="dialog">INV</button>
+      <button class="action-btn" id="shopBtn" aria-haspopup="dialog">
+        <span class="symbol">🛒</span> SHOP
+      </button>
+      <button class="action-btn" id="invBtn" aria-haspopup="dialog">
+        <span class="symbol">📦</span> INV
+      </button>
       <button class="action-btn" id="soundBtn" title="Toggle sound">🔊</button>
-      <button class="action-btn" id="hudToggle" title="Toggle HUD">HUD</button>
+      <button class="action-btn" id="hudToggle" title="Toggle HUD">
+        <span class="symbol">📊</span> HUD
+      </button>
     </div>
   </div>
 
@@ -440,7 +514,9 @@ pointer-events:none;mix-blend-mode:overlay}
     if(!rule) return;
     gameState.achievements[id]=true;
     gameState.achCount = Object.keys(gameState.achievements).length;
-    toast('Achievement unlocked', rule.name, 'good');
+    toast('Achievement unlocked', '🏆 '+rule.name, 'good');
+    addLine('[ACHIEVEMENT] 🏆 '+rule.name,'success-message');
+    playSound('success');
     updateDisplay();
   }
   function checkAchievements(){ achRules.forEach(function(r){ try{ if(r.test()) grantAchievement(r.id); }catch(e){} }); }
