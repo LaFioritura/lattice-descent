@@ -63,6 +63,175 @@ pointer-events:none;mix-blend-mode:overlay}
   color:var(--fg2);
   font-weight:bold;
 }
+.particle{
+  position:fixed;
+  width:2px;
+  height:2px;
+  background:var(--fg);
+  pointer-events:none;
+  z-index:999;
+  opacity:0;
+  box-shadow:0 0 4px var(--fg);
+}
+.particle.active{
+  animation:fall 2s linear forwards;
+}
+@keyframes fall{
+  0%{opacity:1;transform:translateY(0) translateX(0)}
+  100%{opacity:0;transform:translateY(100vh) translateX(calc(var(--drift) * 50px))}
+}
+.action-btn{
+  padding:10px 20px;
+  background:rgba(0,255,65,.1);
+  color:var(--fg);
+  border:1px solid var(--fg);
+  cursor:pointer;
+  font-family:"Courier New",monospace;
+  transition:all .2s;
+  position:relative;
+  overflow:hidden;
+}
+.action-btn:before{
+  content:'';
+  position:absolute;
+  top:50%;
+  left:50%;
+  width:0;
+  height:0;
+  border-radius:50%;
+  background:rgba(0,255,65,.3);
+  transform:translate(-50%,-50%);
+  transition:width .6s, height .6s;
+}
+.action-btn:active:before{
+  width:300px;
+  height:300px;
+}
+.action-btn:hover{background:rgba(0,255,65,.2);transform:translateY(-2px);box-shadow:0 4px 8px rgba(0,255,65,.2)}
+.action-btn:active{transform:translateY(0)}
+.stat{
+  background:rgba(0,255,65,.1);
+  padding:5px 10px;
+  border:1px solid var(--fg);
+  transition:all .3s;
+}
+.stat:hover{
+  background:rgba(0,255,65,.15);
+  box-shadow:0 0 8px rgba(0,255,65,.3);
+}
+.number-change{
+  display:inline-block;
+  animation:numberPop .4s ease-out;
+}
+@keyframes numberPop{
+  0%{transform:scale(1)}
+  50%{transform:scale(1.3);color:#ffff00}
+  100%{transform:scale(1)}
+}
+#terminal{
+  flex:1;
+  background:#000;
+  padding:20px;
+  overflow-y:auto;
+  font-size:14px;
+  line-height:1.6;
+  position:relative;
+}
+#terminal:before{
+  content:'';
+  position:absolute;
+  top:0;
+  left:0;
+  right:0;
+  height:20px;
+  background:linear-gradient(to bottom, rgba(0,255,65,.1), transparent);
+  pointer-events:none;
+}
+.terminal-line{
+  margin:5px 0;
+  animation:slideIn .3s ease-out;
+}
+@keyframes slideIn{
+  from{opacity:0;transform:translateX(-10px)}
+  to{opacity:1;transform:translateX(0)}
+}
+#commandInput{
+  flex:1;
+  background:#000;
+  color:var(--fg);
+  border:1px solid var(--fg);
+  padding:10px;
+  font-family:"Courier New",monospace;
+  outline:none;
+  box-shadow:var(--glow);
+  transition:all .3s;
+}
+#commandInput:focus{
+  border-color:var(--fg2);
+  box-shadow:0 0 12px rgba(0,204,255,.4);
+  background:rgba(0,255,65,.02);
+}
+#commandInput.processing{
+  animation:processPulse 1s infinite;
+}
+@keyframes processPulse{
+  0%,100%{border-color:var(--fg)}
+  50%{border-color:var(--sys)}
+}
+.modal{
+  display:none;
+  position:fixed;
+  top:50%;
+  left:50%;
+  transform:translate(-50%,-50%);
+  background:#000;
+  border:2px solid var(--fg);
+  padding:20px;
+  z-index:1000;
+  max-width:90%;
+  max-height:80%;
+  overflow-y:auto;
+  box-shadow:0 0 0 9999px rgba(0,0,0,.6);
+}
+.toast{
+  min-width:240px;
+  max-width:320px;
+  background:rgba(0,0,0,.9);
+  border:1px solid var(--fg);
+  padding:10px;
+  transform:translateX(400px);
+  transition:transform .4s cubic-bezier(.68,-.55,.265,1.55);
+}
+.toast.show{
+  transform:translateX(0);
+}
+body.glitch-mode #terminal{
+  animation:glitchTerminal .1s infinite;
+}
+@keyframes glitchTerminal{
+  0%{transform:translate(0)}
+  20%{transform:translate(-2px,2px)}
+  40%{transform:translate(2px,-2px)}
+  60%{transform:translate(-2px,-2px)}
+  80%{transform:translate(2px,2px)}
+  100%{transform:translate(0)}
+}
+.glitch-overlay{
+  position:fixed;
+  inset:0;
+  background:rgba(255,51,51,.05);
+  pointer-events:none;
+  opacity:0;
+  mix-blend-mode:overlay;
+  z-index:998;
+}
+.glitch-overlay.active{
+  animation:glitchFlash .5s;
+}
+@keyframes glitchFlash{
+  0%,100%{opacity:0}
+  50%{opacity:1}
+}
 #loadingScreen{position:fixed;inset:0;background:#000;display:flex;flex-direction:column;justify-content:center;align-items:center;z-index:9999}
 .loading-text{font-size:24px;margin-bottom:20px;animation:pulse 1s infinite;text-shadow:var(--glow)}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
@@ -221,12 +390,65 @@ pointer-events:none;mix-blend-mode:overlay}
   function think(t){ addLine('( '+t+' )','thought'); }
 
   function toast(title, body, kind){
-    var t=document.createElement('div'); t.className='toast '+(kind||'info');
-    var h=document.createElement('div'); h.className='title'; h.textContent=title;
-    var p=document.createElement('div'); p.textContent=body;
-    t.appendChild(h); t.appendChild(p);
-    var wrap=$('#toasts'); wrap.appendChild(t);
-    setTimeout(function(){ try{ wrap.removeChild(t); }catch(e){} }, 4200);
+    var t=document.createElement('div'); 
+    t.className='toast '+(kind||'info');
+    var h=document.createElement('div'); 
+    h.className='title'; 
+    h.textContent=title;
+    var p=document.createElement('div'); 
+    p.textContent=body;
+    t.appendChild(h); 
+    t.appendChild(p);
+    var wrap=$('#toasts'); 
+    wrap.appendChild(t);
+    
+    setTimeout(function(){ t.classList.add('show'); }, 10);
+    setTimeout(function(){ 
+      t.classList.remove('show');
+      setTimeout(function(){ 
+        try{ wrap.removeChild(t); }catch(e){} 
+      }, 400);
+    }, 4200);
+  }
+
+  function createParticles(count, fromElement){
+    var rect = fromElement ? fromElement.getBoundingClientRect() : null;
+    var startX = rect ? rect.left + rect.width/2 : window.innerWidth/2;
+    var startY = rect ? rect.top : 0;
+    
+    for(var i=0; i<count; i++){
+      var p = document.createElement('div');
+      p.className = 'particle';
+      p.style.left = startX + 'px';
+      p.style.top = startY + 'px';
+      p.style.setProperty('--drift', (Math.random() - 0.5) * 2);
+      document.body.appendChild(p);
+      
+      setTimeout(function(particle){
+        particle.classList.add('active');
+        setTimeout(function(){ 
+          try{ document.body.removeChild(particle); }catch(e){} 
+        }, 2000);
+      }, i * 50, p);
+    }
+  }
+
+  function flashGlitch(){
+    var overlay = $('#glitchOverlay');
+    overlay.classList.add('active');
+    setTimeout(function(){ overlay.classList.remove('active'); }, 500);
+  }
+
+  function animateNumber(element, newValue){
+    var oldValue = parseInt(element.textContent) || 0;
+    if(oldValue === newValue) return;
+    
+    element.classList.add('number-change');
+    element.textContent = newValue;
+    
+    setTimeout(function(){
+      element.classList.remove('number-change');
+    }, 400);
   }
 
   var AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -363,10 +585,22 @@ pointer-events:none;mix-blend-mode:overlay}
   function stopAmbient(){
     if(!ambientSystem.started) return;
     try{
-      if(ambientSystem.droneOsc) ambientSystem.droneOsc.stop();
-      if(ambientSystem.noiseNode) ambientSystem.noiseNode.stop();
-      if(ambientSystem.binauralLeft) ambientSystem.binauralLeft.stop();
-      if(ambientSystem.binauralRight) ambientSystem.binauralRight.stop();
+      if(ambientSystem.droneOsc){
+        ambientSystem.droneOsc.stop();
+        ambientSystem.droneOsc.disconnect();
+      }
+      if(ambientSystem.noiseNode){
+        ambientSystem.noiseNode.stop();
+        ambientSystem.noiseNode.disconnect();
+      }
+      if(ambientSystem.binauralLeft){
+        ambientSystem.binauralLeft.stop();
+        ambientSystem.binauralLeft.disconnect();
+      }
+      if(ambientSystem.binauralRight){
+        ambientSystem.binauralRight.stop();
+        ambientSystem.binauralRight.disconnect();
+      }
       
       ambientSystem.droneOsc = null;
       ambientSystem.noiseNode = null;
@@ -375,6 +609,7 @@ pointer-events:none;mix-blend-mode:overlay}
       ambientSystem.started = false;
     }catch(e){
       console.error('Stop ambient error:', e);
+      ambientSystem.started = false;
     }
   }
 
@@ -720,10 +955,44 @@ pointer-events:none;mix-blend-mode:overlay}
   function useItem(name){
     var item=gameState.inventory.find(function(i){ return i.name.toLowerCase().indexOf(name.toLowerCase())>-1; });
     if(!item){ addLine("You do not have that item.",'error-message'); return; }
-    if(item.id==='stim'){ gameState.sanity=Math.min(100,gameState.sanity+20); addLine('My thoughts fall into line. [+20 Sanity]','success-message'); playSound('success'); gameState.inventory=gameState.inventory.filter(function(i){ return i!==item; }); completeRequestIf('compose','calm_ok'); }
-    else if(item.id==='keycard'){ addLine('Green light. Doors remember me now.','system-message'); tryUnlockB4(); }
-    else if(item.id==='scanner'){ addLine('I hold the scanner to the wall.','system-message'); setTimeout(function(){ addLine('[It hears something breathing behind the paint.]','thought'); if(Math.random()<0.25){ var pool=Object.keys(noteBank).filter(function(id){ return gameState.notes.indexOf(id)===-1; }); if(pool.length){ grantNote(pool[Math.floor(Math.random()*pool.length)]); } } completeRequestIf('sample','scanner_ok'); maybeUnlockB5ByWisdom(); },800); }
-    else if(item.id==='backup'){ addLine('I save a version of me I will never meet.','system-message'); addLine('(This place files everyone.)','thought'); }
+    
+    if(item.id==='stim'){ 
+      gameState.sanity=Math.min(100,gameState.sanity+20); 
+      addLine('My thoughts fall into line. [+20 Sanity]','success-message'); 
+      playSound('success'); 
+      createParticles(15, $('#sanity').parentElement);
+      gameState.inventory=gameState.inventory.filter(function(i){ return i!==item; }); 
+      completeRequestIf('compose','calm_ok'); 
+    }
+    else if(item.id==='keycard'){ 
+      addLine('Green light. Doors remember me now.','system-message'); 
+      createParticles(10, $('#floor').parentElement);
+      toast('Keycard activated','Access permissions updated','info');
+      tryUnlockB4(); 
+    }
+    else if(item.id==='scanner'){ 
+      addLine('I hold the scanner to the wall.','system-message'); 
+      setTimeout(function(){ 
+        addLine('[It hears something breathing behind the paint.]','thought'); 
+        playSound('glitch');
+        flashGlitch();
+        if(Math.random()<0.3){ 
+          var pool=Object.keys(noteBank).filter(function(id){ return gameState.notes.indexOf(id)===-1; }); 
+          if(pool.length){ 
+            grantNote(pool[Math.floor(Math.random()*pool.length)]); 
+          } 
+        } 
+        completeRequestIf('sample','scanner_ok'); 
+        maybeUnlockB5ByWisdom(); 
+      },900); 
+    }
+    else if(item.id==='backup'){ 
+      addLine('I save a version of me I will never meet.','system-message'); 
+      addLine('(This place files everyone.)','thought'); 
+      toast('Memory Backup','Consciousness snapshot saved','warn');
+      createParticles(20, document.body);
+    }
+    
     updateDisplay();
   }
 
@@ -898,6 +1167,7 @@ pointer-events:none;mix-blend-mode:overlay}
       gameState.floor=target; gameState.place=null; addLine('Elevator sighs downward: '+target+'.','system-message');
       playSound('notification');
       updateAmbientForContext();
+      createParticles(10, $('#floor').parentElement);
       setTimeout(function(){
         if(target==='B5'){
           gameState.sanity=Math.max(0,gameState.sanity-7); addLine('The pressure is overwhelming...','error-message'); playSound('glitch');
