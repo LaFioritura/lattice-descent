@@ -555,6 +555,13 @@ function processCommand() {
 
 }
 if (!validateActionContext("forage")) {
-  log("Non puoi foraggiare ora. Contesto non valido.");
+  addLine("You can't forage right now. Invalid context.", "error-message");
   return;
 }
+}
+if (!validateActionContext("investigate")) {
+  addLine("You find nothing. You need a decoder and ritual access.", "error-message");
+  return;
+}
+
+
