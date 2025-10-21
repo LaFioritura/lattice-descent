@@ -5,3 +5,5 @@ All features from v3.6.0 preserved: deeper English dialogues, investigation/file
 https://lafioritura.github.io/protocol-/  try here 
 ADDED BINAURAL SOUND ESXPERIENCE FROM B1 TO B5 
 buttons turned alive.
+Rifinito gameplay con mini tutorial e feedback di fallimento o successo 
+Audio modulato binaurale che muta onde cerebrali a ogni piano in modo diverso. 
