@@ -1,5 +1,5 @@
 /* ===========================
-   NEXUS PROTOCOL - Commands
+   NEXUS PROTOCOL - Commands (Balanced)
    =========================== */
 
 function processCommand() {
@@ -26,7 +26,7 @@ function processCommand() {
     addLine('=== ACTIONS ===', 'system-message');
     addLine('work - Earn credits, lose coherence');
     addLine('rest - Restore coherence');
-    addLine('scan - Listen to the vents (may find notes)');
+    addLine('scan - Listen to the vents (limited uses)');
     addLine('access [1-9] - Use terminals (lose coherence, gather data)');
     addLine('visit [archives/chapel/loading bay/canteen] - Explore locations');
     addLine('');
@@ -55,9 +55,13 @@ function processCommand() {
     addLine('TRUTHS: Understanding gained. Unlocks deeper layers.');
     addLine('NOTES/FILES: Clues that reveal the story.');
     addLine('');
-    addLine('FLOORS: B1→B2→B3→B4→B5. Each requires specific conditions.');
-    addLine('NPCS: Talk by role (guard/researcher/custodian/voice).');
-    addLine('REQUESTS: Complete tasks to earn credits and unlock areas.');
+    addLine('PROGRESSION: Complete requests, talk to NPCs, access terminals.');
+    addLine('B2: Requires 2 completed requests + 1 Truth');
+    addLine('B3: Requires talking to Marcus + 2 Truths');
+    addLine('B4: Requires Keycard + talking to Sarah + 3 Truths');
+    addLine('B5: Requires Scanner + Keycard + Pattern (7→3→9) + 4 Truths');
+    addLine('');
+    addLine('WIN: Access terminal 9 on B5 with Scanner and 3+ Truths');
     return;
   }
 
@@ -124,12 +128,27 @@ function processCommand() {
       addLine('Where? Options: archives, chapel, loading bay, canteen', 'hint-message');
       return;
     }
+    
+    // Track visited locations
+    if (!gameState._visitedPlaces) gameState._visitedPlaces = {};
+    if (gameState._visitedPlaces[key]) {
+      addLine('You have already thoroughly explored this location.', 'thought');
+      gameState.place = key;
+      var lines = placesDesc[key];
+      addLine('— ' + key.toUpperCase() + ' —', 'system-message');
+      addLine(lines[Math.floor(Math.random() * lines.length)]);
+      completeRequestIf('visit', key);
+      return;
+    }
+    
     gameState.place = key;
+    gameState._visitedPlaces[key] = true;
     var lines = placesDesc[key];
     addLine('— ' + key.toUpperCase() + ' —', 'system-message');
     addLine(lines[Math.floor(Math.random() * lines.length)]);
 
-    if (Math.random() < 0.5) {
+    // Only first visit gives rewards
+    if (Math.random() < 0.6) {
       var pool = Object.keys(noteBank).filter(function (id) {
         return gameState.notes.indexOf(id) === -1;
       });
@@ -216,22 +235,22 @@ function processCommand() {
     if (!gameState.floorsUnlocked[target]) {
       if (target === 'B2') {
         addLine('[ELEVATOR HESITATES] Access denied.', 'error-message');
-        hint('Complete a request or access terminals to unlock B2.');
+        hint('Complete 2 requests and gain 1 Truth to unlock B2.');
         return;
       }
       if (target === 'B3') {
         addLine('[ELEVATOR HESITATES] Research clearance required.', 'error-message');
-        hint('Speak with Marcus on B2 or gain understanding (Truths) to unlock B3.');
+        hint('Talk to Marcus on B2 and gain 2 Truths to unlock B3.');
         return;
       }
       if (target === 'B4') {
-        addLine('[ELEVATOR HESITATES] Keycard required.', 'error-message');
-        hint('Purchase a keycard from Requisition to unlock B4.');
+        addLine('[ELEVATOR HESITATES] Maintenance clearance required.', 'error-message');
+        hint('Purchase Keycard, talk to Sarah on B3, and gain 3 Truths to unlock B4.');
         return;
       }
       if (target === 'B5') {
-        addLine('[ELEVATOR HESITATES] Insufficient clearance.', 'error-message');
-        hint('Requires: Keycard + Bio-Scanner + 2 Truths to access B5.');
+        addLine('[ELEVATOR HESITATES] Maximum clearance required.', 'error-message');
+        hint('Requires: Keycard + Scanner + Pattern Complete (7→3→9) + 4 Truths.');
         return;
       }
     }
@@ -250,11 +269,19 @@ function processCommand() {
       if (
         !gameState.inventory.some(function (i) {
           return i.id === 'scanner';
-        }) ||
-        gameState.truths < 2
+        })
       ) {
-        addLine('[ACCESS DENIED] Inadequate preparation.', 'error-message');
-        hint('B5 requires Bio-Scanner and at least 2 Truths.');
+        addLine('[ACCESS DENIED] Bio-Scanner required for B5.', 'error-message');
+        return;
+      }
+      if (!gameState.dataChain || !gameState.dataChain.done) {
+        addLine('[ACCESS DENIED] Terminal pattern incomplete.', 'error-message');
+        hint('Complete the sequence: access terminals 7, then 3, then 9.');
+        return;
+      }
+      if (gameState.truths < 4) {
+        addLine('[ACCESS DENIED] Insufficient understanding.', 'error-message');
+        hint('Gain more Truths by talking to NPCs and reading files.');
         return;
       }
     }
@@ -312,7 +339,7 @@ function processCommand() {
     if (npc === npcsData.echo) {
       if (!gameState.echoUnlocked) {
         addLine('(Silence. It is waiting for understanding, not insistence.)', 'thought');
-        hint('Echo requires deeper connection. Speak with others and gather Truths first.');
+        hint('Echo requires: talk to Marcus & Sarah + complete pattern (7→3→9) + 4 Truths.');
         return;
       }
       if (gameState.floor !== 'B5') {
@@ -329,6 +356,7 @@ function processCommand() {
       if (npc === npcsData.janitor) talkTo('janitor');
 
       if (gameState.met.marcus > 0) tryUnlockB3();
+      if (gameState.met.sarah > 0) tryUnlockB4();
       completeRequestIf('speak', npc.role[0]);
       maybeUnlockEcho();
       maybeUnlockB5ByWisdom();
@@ -375,7 +403,10 @@ function processCommand() {
       gameState.coherence = Math.max(0, gameState.coherence - loss);
       addLine('[-' + loss + ' Coherence]', 'error-message');
 
-      if (!gameState.dataChain) initDataChain();
+      // Initialize data chain only after accessing terminal 7, 3, or 9
+      if (!gameState.dataChain && (tnum === '7' || tnum === '3' || tnum === '9')) {
+        initDataChain();
+      }
 
       if (gameState.dataChain && !gameState.dataChain.done) {
         var exp = gameState.dataChain.steps[gameState.dataChain.index];
@@ -392,13 +423,14 @@ function processCommand() {
           if (gameState.dataChain.index >= gameState.dataChain.steps.length) {
             gameState.dataChain.done = true;
             gameState.truths++;
-            addLine(
-              '[PATTERN COMPLETE] Something in me stops resisting.',
-              'success-message'
-            );
+            addLine('[PATTERN COMPLETE] Something in me stops resisting.', 'success-message');
             toast('Data Chain Complete', 'Pattern recognized', 'good');
             createParticles(20, document.body);
+            hint('B5 access is now possible if you have Scanner, Keycard, and 4 Truths.');
           }
+        } else if (tnum === '7' || tnum === '3' || tnum === '9') {
+          addLine('[Pattern broken. Must restart from terminal 7.]', 'error-message');
+          gameState.dataChain.index = 0;
         }
       }
 
@@ -407,6 +439,7 @@ function processCommand() {
       maybeUnlockEcho();
       maybeUnlockB5ByWisdom();
 
+      // Win condition
       if (
         gameState.floorsUnlocked.B5 &&
         gameState.floor === 'B5' &&
@@ -426,10 +459,18 @@ function processCommand() {
   }
 
   if (cmdw === 'investigate') {
+    // Limit investigate usage
+    if (!gameState._investigateCount) gameState._investigateCount = 0;
+    if (gameState._investigateCount >= 5) {
+      addLine('[I have exhausted my investigation efforts here.]', 'thought');
+      return;
+    }
+    gameState._investigateCount++;
+
     var topic = arg || 'anything';
     addLine('[Investigating: ' + topic + ']', 'system-message');
 
-    if (Math.random() < 0.7) {
+    if (Math.random() < 0.5) {
       var fpool = fileBank.filter(function (f) {
         return !gameState.files.find(function (x) {
           return x.id === f.id;
@@ -448,7 +489,15 @@ function processCommand() {
   }
 
   if (cmdw === 'forage') {
-    var gain = 6 + Math.floor(Math.random() * 8);
+    // Limit forage usage
+    if (!gameState._forageCount) gameState._forageCount = 0;
+    if (gameState._forageCount >= 6) {
+      addLine('[The drawers have been picked clean.]', 'thought');
+      return;
+    }
+    gameState._forageCount++;
+
+    var gain = 8 + Math.floor(Math.random() * 12);
     gameState.credits += gain;
     addLine('[Shaking drawers yields forgotten coins] +' + gain + '¢', 'success-message');
     updateDisplay();
@@ -457,6 +506,12 @@ function processCommand() {
 
   if (cmdw === 'analyze') {
     if (gameState.notes.length >= 3 || gameState.files.length >= 2) {
+      // Limit analyze to gain truth only once
+      if (gameState._analyzedOnce) {
+        addLine('[The patterns repeat themselves without new meaning.]', 'thought');
+        return;
+      }
+      gameState._analyzedOnce = true;
       gameState.truths++;
       addLine('[I align notes until a tone emerges] +1 Truth', 'success-message');
       createParticles(12, $('#coherence').parentElement);
@@ -482,6 +537,15 @@ function processCommand() {
       return gameState.floorsUnlocked[f];
     });
     addLine('Floor Access: ' + unlocked.join(', '));
+    if (gameState.dataChain) {
+      addLine(
+        'Pattern Progress: ' +
+          gameState.dataChain.index +
+          '/' +
+          gameState.dataChain.steps.length +
+          (gameState.dataChain.done ? ' [COMPLETE]' : '')
+      );
+    }
     return;
   }
 
@@ -512,23 +576,31 @@ function processCommand() {
   }
 
   if (cmdw === 'hack') {
+    // Limit hack usage
+    if (!gameState._hackCount) gameState._hackCount = 0;
+    if (gameState._hackCount >= 4) {
+      addLine('[The terminals have learned my tricks.]', 'error-message');
+      return;
+    }
+    gameState._hackCount++;
+
     if (gameState.credits < 20) {
       addLine('I need a small stake to risk.', 'error-message');
       return;
     }
     gameState.credits -= 20;
     var p = Math.random();
-    if (p < 0.12) {
-      gameState.credits += 220;
-      addLine('[The machine blushes and pays out] +220¢', 'success-message');
+    if (p < 0.1) {
+      gameState.credits += 180;
+      addLine('[The machine blushes and pays out] +180¢', 'success-message');
       playSound('success');
-    } else if (p < 0.45) {
-      gameState.credits += 45;
-      addLine('[Loose change in the circuitry] +45¢', 'success-message');
+    } else if (p < 0.35) {
+      gameState.credits += 40;
+      addLine('[Loose change in the circuitry] +40¢', 'success-message');
     } else {
       addLine('[The cursor laughs without sound]', 'error-message');
-      gameState.coherence = Math.max(0, gameState.coherence - 3);
-      addLine('[-3 Coherence]', 'error-message');
+      gameState.coherence = Math.max(0, gameState.coherence - 4);
+      addLine('[-4 Coherence]', 'error-message');
     }
     updateDisplay();
     return;

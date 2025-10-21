@@ -1,5 +1,5 @@
 /* ===========================
-   NEXUS PROTOCOL - Game Logic
+   NEXUS PROTOCOL - Game Logic (Balanced)
    =========================== */
 
 function grantAchievement(id) {
@@ -63,17 +63,19 @@ function doLook() {
 
 function canUnlockFloor(floor) {
   if (floor === 'B2') {
-    return gameState._completedRequests >= 1 || gameState.truths >= 1;
+    return gameState._completedRequests >= 2 && gameState.truths >= 1;
   }
   if (floor === 'B3') {
-    return gameState.floorsUnlocked.B2 && (gameState.met.marcus > 0 || gameState.truths >= 1);
+    return gameState.floorsUnlocked.B2 && gameState.met.marcus > 0 && gameState.truths >= 2;
   }
   if (floor === 'B4') {
     return (
       gameState.floorsUnlocked.B3 &&
+      gameState.met.sarah > 0 &&
       gameState.inventory.some(function (i) {
         return i.id === 'keycard';
-      })
+      }) &&
+      gameState.truths >= 3
     );
   }
   if (floor === 'B5') {
@@ -85,7 +87,9 @@ function canUnlockFloor(floor) {
       gameState.inventory.some(function (i) {
         return i.id === 'scanner';
       }) &&
-      gameState.truths >= 2
+      gameState.truths >= 4 &&
+      gameState.dataChain &&
+      gameState.dataChain.done
     );
   }
   return false;
@@ -123,7 +127,7 @@ function tryUnlockB5() {
     gameState.floorsUnlocked.B5 = true;
     think('The bottom floor exhales.');
     toast('Access expanded', 'B5 is now reachable.', 'warn');
-    hint('WARNING: B5 drains coherence rapidly. Prepare before descending.');
+    hint('WARNING: B5 drains coherence rapidly. Complete the pattern sequence first.');
   }
 }
 
@@ -229,15 +233,19 @@ function finishRequest(r) {
   gameState._completedRequests++;
   createParticles(15, $('#credits').parentElement);
 
-  if (!gameState.floorsUnlocked.B2) {
+  // Progression gates
+  if (!gameState.floorsUnlocked.B2 && gameState._completedRequests >= 2) {
     tryUnlockB2();
-  } else if (!gameState.floorsUnlocked.B3 && (gameState.met.marcus > 0 || gameState.truths >= 1)) {
+  }
+  if (!gameState.floorsUnlocked.B3 && gameState.met.marcus > 0) {
     tryUnlockB3();
-  } else if (!gameState.floorsUnlocked.B4 && canUnlockFloor('B4')) {
+  }
+  if (!gameState.floorsUnlocked.B4 && gameState.met.sarah > 0) {
     tryUnlockB4();
   }
 
-  if (Math.random() < 0.35) {
+  // Reduced note drop rate
+  if (Math.random() < 0.25) {
     var pool = Object.keys(noteBank).filter(function (id) {
       return gameState.notes.indexOf(id) === -1;
     });
@@ -246,7 +254,9 @@ function finishRequest(r) {
       grantNote(pick);
     }
   }
-  if (Math.random() < 0.3) {
+  
+  // Reduced truth gain
+  if (Math.random() < 0.2) {
     gameState.truths++;
     think('I understand a little more.');
     createParticles(10, $('#coherence').parentElement);
@@ -352,16 +362,28 @@ function readFile(arg) {
   f.body.forEach(function (p) {
     addLine(p);
   });
-  if (Math.random() < 0.4) {
+  
+  // Truth gain only from special files
+  if ((f.id === 'CF-05' || f.id === 'CF-07') && !f.readBefore) {
     gameState.truths++;
     think('The pieces agree for a breath.');
     createParticles(8, $('#coherence').parentElement);
+    f.readBefore = true;
   }
+  
   completeRequestIf('investigate', { readFile: true });
   updateDisplay();
 }
 
 function scanEvent() {
+  // Limit scan usage
+  if (!gameState._scanCount) gameState._scanCount = 0;
+  if (gameState._scanCount >= 8) {
+    addLine('[The vents have nothing left to say.]', 'thought');
+    return;
+  }
+  gameState._scanCount++;
+  
   var res = [
     'Something lives in the vents.',
     'The corridor forgets its angles.',
@@ -373,7 +395,8 @@ function scanEvent() {
   gameState.coherence = Math.max(0, gameState.coherence - 3);
   addLine('[-3 Coherence]', 'error-message');
 
-  if (Math.random() < 0.25) {
+  // Only first 3 scans can give notes
+  if (gameState._scanCount <= 3 && Math.random() < 0.4) {
     var pool = Object.keys(noteBank).filter(function (id) {
       return gameState.notes.indexOf(id) === -1;
     });
@@ -381,15 +404,17 @@ function scanEvent() {
       grantNote(pool[Math.floor(Math.random() * pool.length)]);
     }
   }
+  
   if (gameState.floor === 'B2') completeRequestIf('restore', 'b2_scan_ok');
   completeRequestIf('scan');
   updateDisplay();
 }
 
 function initDataChain() {
+  if (gameState.dataChain) return; // Prevent re-initialization
   gameState.dataChain = { steps: [7, 3, 9], index: 0, done: false };
-  think('Something wants me to follow: 7 → 3 → 9.');
-  hint('Access terminals in sequence: 7, then 3, then 9.');
+  think('A pattern emerges from the terminal logs: 7 → 3 → 9.');
+  hint('Access terminals in this specific sequence to unlock deeper access.');
 }
 
 function maybeUnlockEcho() {
@@ -397,7 +422,9 @@ function maybeUnlockEcho() {
   if (
     !gameState.echoUnlocked &&
     spoke &&
-    ((gameState.dataChain && gameState.dataChain.done) || gameState.truths >= 3)
+    gameState.dataChain &&
+    gameState.dataChain.done &&
+    gameState.truths >= 4
   ) {
     gameState.echoUnlocked = true;
     think('The hush on B5 starts answering the outline of my breath.');
@@ -537,12 +564,20 @@ function useItem(name) {
     toast('Keycard activated', 'Access permissions updated', 'info');
     tryUnlockB4();
   } else if (item.id === 'scanner') {
+    // Limit scanner usage
+    if (!gameState._scannerUses) gameState._scannerUses = 0;
+    if (gameState._scannerUses >= 5) {
+      addLine('[The scanner battery is depleted.]', 'error-message');
+      return;
+    }
+    gameState._scannerUses++;
+    
     addLine('[I hold the scanner to the wall...]', 'system-message');
     setTimeout(function () {
       addLine('[It hears something breathing behind the paint.]', 'thought');
       playSound('glitch');
       flashGlitch();
-      if (Math.random() < 0.3) {
+      if (gameState._scannerUses <= 3 && Math.random() < 0.4) {
         var pool = Object.keys(noteBank).filter(function (id) {
           return gameState.notes.indexOf(id) === -1;
         });
@@ -566,6 +601,13 @@ function useItem(name) {
 function talkTo(npcId) {
   var npc = npcsData[npcId];
   if (!npc) return;
+  
+  // Limit conversation depth
+  if (gameState.met[npcId] >= 3) {
+    addLine('[' + npc.name + ' has nothing more to say right now.]', 'thought');
+    return;
+  }
+  
   var bank = tierLines[npcId] || [['...', '...']];
   var i = Math.min(gameState.met[npcId] || 0, bank.length - 1);
   var pair = bank[i];
@@ -574,7 +616,8 @@ function talkTo(npcId) {
   addLine('[' + npc.name + ']:', 'npc-message');
   addLine(line, 'npc-message');
 
-  if (Math.random() < 0.25) {
+  // Only first conversation gives notes
+  if (gameState.met[npcId] === 0 && Math.random() < 0.5) {
     var pool = Object.keys(noteBank).filter(function (id) {
       return gameState.notes.indexOf(id) === -1;
     });
@@ -582,7 +625,9 @@ function talkTo(npcId) {
       grantNote(pool[Math.floor(Math.random() * pool.length)]);
     }
   }
-  if (Math.random() < 0.2) {
+  
+  // Only some conversations give files
+  if (gameState.met[npcId] === 1 && Math.random() < 0.3) {
     var fpool = fileBank.filter(function (f) {
       return !gameState.files.find(function (x) {
         return x.id === f.id;
@@ -592,13 +637,16 @@ function talkTo(npcId) {
       grantFile(fpool[Math.floor(Math.random() * fpool.length)]);
     }
   }
-  if (Math.random() < 0.2 && npcId !== 'echo') {
+  
+  // Truth gain only on meaningful conversations
+  if (gameState.met[npcId] <= 1 && npcId !== 'echo') {
     gameState.truths++;
     think('Their words find a place to sit in me.');
   }
 
   gameState.met[npcId] = (gameState.met[npcId] || 0) + 1;
 
+  // Conversation choices (only on first meeting)
   if (npcId === 'marcus' && gameState.met.marcus === 1) {
     makeChoices([
       {
@@ -642,7 +690,7 @@ function talkTo(npcId) {
       }
     ]);
   }
-  if (npcId === 'echo' && gameState.truths >= 3) {
+  if (npcId === 'echo' && gameState.truths >= 4) {
     makeChoices([
       {
         label: 'Admit you arrived by deciding to be here',
