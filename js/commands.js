@@ -1,5 +1,5 @@
 /* ===========================
-   NEXUS PROTOCOL - Commands (Balanced)
+   NEXUS PROTOCOL - Commands (INVESTIGATIVE SYSTEM)
    =========================== */
 
 function processCommand() {
@@ -23,45 +23,115 @@ function processCommand() {
     addLine('move [B1-B5] - Travel between floors');
     addLine('talk [guard/researcher/custodian/voice] - Speak with NPCs');
     addLine('');
+    addLine('=== INVESTIGATION ===', 'system-message');
+    addLine('scan - Listen to vents (find notes by floor)');
+    addLine('files - List collected files');
+    addLine('read [id] - Read and analyze a file (REQUIRED for unlocks)');
+    addLine('notes - View collected notes');
+    addLine('progress - Show detailed unlock requirements');
+    addLine('');
     addLine('=== ACTIONS ===', 'system-message');
-    addLine('work - Earn credits, lose coherence');
-    addLine('rest - Restore coherence');
-    addLine('scan - Listen to the vents (limited uses)');
-    addLine('access [1-9] - Use terminals (lose coherence, gather data)');
-    addLine('visit [archives/chapel/loading bay/canteen] - Explore locations');
+    addLine('work - Earn credits (lose coherence)');
+    addLine('rest - Restore coherence (REQUIRED for unlocks)');
+    addLine('access [1-9] - Use terminals (pattern: 7→3→9)');
+    addLine('visit [place] - Explore: archives/chapel/loading bay/canteen');
+    addLine('clean - Help maintenance (B4 only)');
     addLine('');
     addLine('=== MANAGEMENT ===', 'system-message');
-    addLine('requests - View available tasks');
-    addLine('accept [1-3] - Focus on a specific request');
+    addLine('requests - View active tasks');
+    addLine('accept [1-3] - Focus on a request');
     addLine('refresh - Get new requests (-20¢)');
     addLine('use [item] - Use inventory item');
     addLine('');
     addLine('=== INFO ===', 'system-message');
     addLine('status - Full character status');
-    addLine('notes - View collected notes');
-    addLine('files - View collected files');
-    addLine('read [id] - Read a specific file');
-    addLine('map - Show floor access');
     addLine('who - List NPCs by floor');
     addLine('achievements - View progress');
-    addLine('legend - Game mechanics explanation');
     return;
   }
 
-  if (cmdw === 'legend') {
-    addLine('=== GAME MECHANICS ===', 'system-message');
-    addLine('COHERENCE: Your mental clarity. Keep above 0 to survive.');
-    addLine('CREDITS: Currency for purchasing items.');
-    addLine('TRUTHS: Understanding gained. Unlocks deeper layers.');
-    addLine('NOTES/FILES: Clues that reveal the story.');
+  if (cmdw === 'progress') {
+    addLine('=== INVESTIGATIVE PROGRESSION ===', 'system-message');
     addLine('');
-    addLine('PROGRESSION: Complete requests, talk to NPCs, access terminals.');
-    addLine('B2: Requires 2 completed requests + 1 Truth');
-    addLine('B3: Requires talking to Marcus + 2 Truths');
-    addLine('B4: Requires Keycard + talking to Sarah + 3 Truths');
-    addLine('B5: Requires Scanner + Keycard + Pattern (7→3→9) + 4 Truths');
+    
+    // B1 (always unlocked)
+    addLine('█ B1 (Admin): [UNLOCKED] Starting floor');
     addLine('');
-    addLine('WIN: Access terminal 9 on B5 with Scanner and 3+ Truths');
+    
+    // B2 Requirements
+    var b2Reqs = gameState._completedRequests + '/3 requests, ' + 
+                 gameState.coherence + '/60 coherence, ' +
+                 gameState.notes.length + '/2 notes';
+    var b2File = gameState.files.some(function (f) { 
+      return (f.id === 'CF-03' || f.id === 'CF-06') && f._read; 
+    });
+    b2Reqs += ', ' + (b2File ? '✓' : '○') + ' file read';
+    
+    addLine('█ B2 (Security): ' + (gameState.floorsUnlocked.B2 ? '[UNLOCKED]' : '[LOCKED]'));
+    addLine('  Requirements:');
+    addLine('    • Complete 3 requests: ' + gameState._completedRequests + '/3');
+    addLine('    • Coherence ≥ 60%: ' + gameState.coherence + '%');
+    addLine('    • Collect 2 notes: ' + gameState.notes.length + '/2');
+    addLine('    • Read CF-03 or CF-06: ' + (b2File ? '✓' : '○ (visit archives/canteen)'));
+    addLine('');
+    
+    // B3 Requirements
+    if (gameState.floorsUnlocked.B2 || gameState._completedRequests >= 3) {
+      var b3File = gameState.files.some(function (f) { return f.id === 'CF-01' && f._read; });
+      addLine('█ B3 (Research): ' + (gameState.floorsUnlocked.B3 ? '[UNLOCKED]' : '[LOCKED]'));
+      addLine('  Requirements:');
+      addLine('    • B2 unlocked: ' + (gameState.floorsUnlocked.B2 ? '✓' : '○'));
+      addLine('    • Complete 5 total requests: ' + gameState._completedRequests + '/5');
+      addLine('    • Talk to Marcus: ' + (gameState.met.marcus > 0 ? '✓' : '○ (move b2, talk guard)'));
+      addLine('    • Coherence ≥ 50%: ' + gameState.coherence + '%');
+      addLine('    • Collect 4 notes: ' + gameState.notes.length + '/4');
+      addLine('    • Read CF-01: ' + (b3File ? '✓' : '○ (from Marcus)'));
+      addLine('');
+    }
+    
+    // B4 Requirements
+    if (gameState.floorsUnlocked.B3 || gameState._completedRequests >= 5) {
+      var b4File1 = gameState.files.some(function (f) { return f.id === 'CF-02' && f._read; });
+      var b4File2 = gameState.files.some(function (f) { return f.id === 'CF-07' && f._read; });
+      var hasKeycard = gameState.inventory.some(function (i) { return i.id === 'keycard'; });
+      addLine('█ B4 (Maintenance): ' + (gameState.floorsUnlocked.B4 ? '[UNLOCKED]' : '[LOCKED]'));
+      addLine('  Requirements:');
+      addLine('    • B3 unlocked: ' + (gameState.floorsUnlocked.B3 ? '✓' : '○'));
+      addLine('    • Complete 8 total requests: ' + gameState._completedRequests + '/8');
+      addLine('    • Talk to Sarah: ' + (gameState.met.sarah > 0 ? '✓' : '○ (move b3, talk researcher)'));
+      addLine('    • Purchase Keycard (120¢): ' + (hasKeycard ? '✓' : '○'));
+      addLine('    • Collect 7 notes: ' + gameState.notes.length + '/7');
+      addLine('    • Gain 2 Truths: ' + gameState.truths + '/2');
+      addLine('    • Read CF-02: ' + (b4File1 ? '✓' : '○ (from Sarah)'));
+      addLine('    • Read CF-07: ' + (b4File2 ? '✓' : '○ (from Sarah)'));
+      addLine('');
+    }
+    
+    // B5 Requirements
+    if (gameState.floorsUnlocked.B4 || gameState._completedRequests >= 8) {
+      var b5File = gameState.files.some(function (f) { return f.id === 'CF-04' && f._read; });
+      var hasScanner = gameState.inventory.some(function (i) { return i.id === 'scanner'; });
+      var patternDone = gameState.dataChain && gameState.dataChain.done;
+      addLine('█ B5 (Depths): ' + (gameState.floorsUnlocked.B5 ? '[UNLOCKED]' : '[LOCKED]'));
+      addLine('  Requirements:');
+      addLine('    • B4 unlocked: ' + (gameState.floorsUnlocked.B4 ? '✓' : '○'));
+      addLine('    • Complete 12 total requests: ' + gameState._completedRequests + '/12');
+      addLine('    • Talk to Janitor: ' + (gameState.met.janitor > 0 ? '✓' : '○ (move b4, talk custodian)'));
+      addLine('    • Purchase Scanner (150¢): ' + (hasScanner ? '✓' : '○'));
+      addLine('    • Complete Pattern (7→3→9): ' + (patternDone ? '✓' : '○'));
+      addLine('    • Coherence ≥ 40%: ' + gameState.coherence + '%');
+      addLine('    • Collect 10 notes: ' + gameState.notes.length + '/10');
+      addLine('    • Gain 3 Truths: ' + gameState.truths + '/3');
+      addLine('    • Read CF-04: ' + (b5File ? '✓' : '○ (from Janitor)'));
+      addLine('');
+    }
+    
+    addLine('=== VICTORY CONDITION ===', 'system-message');
+    addLine('Access terminal 9 on B5 with Scanner + 4 Truths');
+    addLine('');
+    addLine('💡 Tip: Use "scan" on each floor to collect notes');
+    addLine('💡 Tip: Always "read" files after collecting them');
+    addLine('💡 Tip: Use "rest" frequently to maintain coherence');
     return;
   }
 
@@ -75,42 +145,11 @@ function processCommand() {
 
   if (cmdw === 'who') {
     addLine('=== PERSONNEL ROSTER ===', 'system-message');
-    addLine(
-      'B2: ' + (gameState.floorsUnlocked.B2 ? 'Marcus Webb (Security Officer)' : '[LOCKED]')
-    );
-    addLine('B3: ' + (gameState.floorsUnlocked.B3 ? 'Dr. Sarah Chen (Researcher)' : '[LOCKED]'));
-    addLine(
-      'B4: ' + (gameState.floorsUnlocked.B4 ? 'Maintenance Unit 4 (Custodian)' : '[LOCKED]')
-    );
-    addLine(
-      'B5: ' +
-        (gameState.floorsUnlocked.B5
-          ? gameState.echoUnlocked
-            ? 'Echo (Presence)'
-            : '[SILENT]'
-          : '[LOCKED]')
-    );
-    return;
-  }
-
-  if (cmdw === 'hud') {
-    var h = $('#hud');
-    h.style.display = h.style.display === 'block' ? 'none' : 'block';
-    addLine('Monitor ' + (h.style.display === 'block' ? 'enabled' : 'disabled'), 'system-message');
-    return;
-  }
-
-  if (cmdw === 'map') {
-    var floors = ['B5', 'B4', 'B3', 'B2', 'B1'];
-    addLine('=== FLOOR MAP ===', 'system-message');
-    var roster = rosterByFloor();
-    floors.forEach(function (f) {
-      var line = (f === gameState.floor ? '> ' : '  ') + f + (f === gameState.floor ? ' <' : '');
-      if (!gameState.floorsUnlocked[f]) line += ' [LOCKED]';
-      var names = roster[f] && roster[f].length ? ' — ' + roster[f].join(', ') : '';
-      addLine(line + names);
-    });
-    if (gameState.place) addLine('[Current location: ' + gameState.place + ']');
+    addLine('B1: [No personnel assigned]');
+    addLine('B2: ' + (gameState.floorsUnlocked.B2 ? 'Marcus Webb (Security) - ' + gameState.met.marcus + '/3 talks' : '[LOCKED]'));
+    addLine('B3: ' + (gameState.floorsUnlocked.B3 ? 'Dr. Sarah Chen (Research) - ' + gameState.met.sarah + '/3 talks' : '[LOCKED]'));
+    addLine('B4: ' + (gameState.floorsUnlocked.B4 ? 'Maintenance Unit 4 (Custodian) - ' + gameState.met.janitor + '/3 talks' : '[LOCKED]'));
+    addLine('B5: ' + (gameState.floorsUnlocked.B5 ? (gameState.echoUnlocked ? 'Echo (Presence) - ' + gameState.met.echo + '/3 talks' : '[SILENT - Complete requirements]') : '[LOCKED]'));
     return;
   }
 
@@ -121,51 +160,61 @@ function processCommand() {
 
   if (cmdw === 'visit') {
     var place = arg.toLowerCase();
-    var key = places.find(function (p) {
-      return p === place;
-    });
+    if (!place) {
+      addLine('Visit where? Options: archives, chapel, loading bay, canteen', 'hint-message');
+      return;
+    }
+    
+    var key = places.find(function (p) { return p === place; });
     if (!key) {
-      addLine('Where? Options: archives, chapel, loading bay, canteen', 'hint-message');
+      addLine('Unknown location. Options: archives, chapel, loading bay, canteen', 'error-message');
       return;
     }
-    
-    // Track visited locations
-    if (!gameState._visitedPlaces) gameState._visitedPlaces = {};
+
     if (gameState._visitedPlaces[key]) {
-      addLine('You have already thoroughly explored this location.', 'thought');
+      addLine('You have already explored ' + key + ' thoroughly.', 'thought');
       gameState.place = key;
-      var lines = placesDesc[key];
-      addLine('— ' + key.toUpperCase() + ' —', 'system-message');
-      addLine(lines[Math.floor(Math.random() * lines.length)]);
-      completeRequestIf('visit', key);
       return;
     }
-    
+
     gameState.place = key;
     gameState._visitedPlaces[key] = true;
     var lines = placesDesc[key];
     addLine('— ' + key.toUpperCase() + ' —', 'system-message');
     addLine(lines[Math.floor(Math.random() * lines.length)]);
 
-    // Only first visit gives rewards
-    if (Math.random() < 0.6) {
-      var pool = Object.keys(noteBank).filter(function (id) {
-        return gameState.notes.indexOf(id) === -1;
-      });
-      if (pool.length) {
-        grantNote(pool[Math.floor(Math.random() * pool.length)]);
+    // Deterministic file drops by location
+    var locationFiles = {
+      'archives': ['CF-03', 'CF-06'],
+      'chapel': [],
+      'loading bay': [],
+      'canteen': ['CF-06']
+    };
+
+    var fileIds = locationFiles[key] || [];
+    fileIds.forEach(function (fid) {
+      var fileObj = fileBank.find(function (f) { return f.id === fid; });
+      if (fileObj && !gameState.files.find(function (x) { return x.id === fid; })) {
+        grantFile(fileObj);
       }
+    });
+
+    // Notes from locations
+    var locationNotes = {
+      'archives': ['N3', 'N6'],
+      'chapel': ['N1', 'N11'],
+      'loading bay': ['N9', 'N13'],
+      'canteen': ['N10']
+    };
+
+    var notePool = (locationNotes[key] || []).filter(function (id) {
+      return gameState.notes.indexOf(id) === -1;
+    });
+
+    if (notePool.length > 0) {
+      grantNote(notePool[0]);
     }
-    if (Math.random() < 0.4) {
-      var fpool = fileBank.filter(function (f) {
-        return !gameState.files.find(function (x) {
-          return x.id === f.id;
-        });
-      });
-      if (fpool.length) {
-        grantFile(fpool[Math.floor(Math.random() * fpool.length)]);
-      }
-    }
+
     completeRequestIf('visit', key);
     updateDisplay();
     return;
@@ -175,6 +224,7 @@ function processCommand() {
     listFiles();
     return;
   }
+
   if (cmdw === 'read') {
     readFile(arg);
     return;
@@ -182,11 +232,14 @@ function processCommand() {
 
   if (cmdw === 'notes') {
     addLine('=== COLLECTED NOTES ===', 'system-message');
-    if (gameState.notes.length === 0) addLine('No notes yet.');
-    else
+    if (gameState.notes.length === 0) {
+      addLine('No notes yet. Use "scan" to find them on each floor.');
+    } else {
       gameState.notes.forEach(function (id) {
         addLine('• ' + noteBank[id]);
       });
+    }
+    addLine('Notes collected: ' + gameState.notes.length + '/16');
     return;
   }
 
@@ -198,7 +251,7 @@ function processCommand() {
   if (cmdw === 'accept') {
     var n = parseInt(arg, 10) - 1;
     if (isNaN(n) || n < 0 || n >= gameState.requests.length) {
-      addLine('Which one? (1-3)', 'error-message');
+      addLine('Which one? Use: accept 1, accept 2, or accept 3', 'error-message');
       return;
     }
     addLine('[FOCUSED] ' + gameState.requests[n].desc, 'success-message');
@@ -220,8 +273,10 @@ function processCommand() {
 
   if (cmdw === 'use') {
     if (!arg) {
-      addLine('Use what? Check inventory.', 'error-message');
-    } else useItem(arg);
+      addLine('Use what? Check inventory with EFFECTS button.', 'error-message');
+    } else {
+      useItem(arg);
+    }
     return;
   }
 
@@ -232,60 +287,90 @@ function processCommand() {
       return;
     }
 
+    if (target === gameState.floor) {
+      addLine('You are already on ' + target + '.', 'thought');
+      return;
+    }
+
+    // Check unlock with detailed feedback
     if (!gameState.floorsUnlocked[target]) {
       if (target === 'B2') {
-        addLine('[ELEVATOR HESITATES] Access denied.', 'error-message');
-        hint('Complete 2 requests and gain 1 Truth to unlock B2.');
+        addLine('[ELEVATOR HESITATES] Investigation incomplete.', 'error-message');
+        var hasFile = gameState.files.some(function (f) { 
+          return (f.id === 'CF-03' || f.id === 'CF-06') && f._read; 
+        });
+        if (gameState._completedRequests < 3) hint('Complete ' + (3 - gameState._completedRequests) + ' more requests.');
+        if (gameState.coherence < 60) hint('Coherence too low. Rest to ≥ 60% (currently ' + gameState.coherence + '%)');
+        if (gameState.notes.length < 2) hint('Need ' + (2 - gameState.notes.length) + ' more notes. Use "scan" command.');
+        if (!hasFile) hint('Read CF-03 or CF-06. Visit archives or canteen to find files.');
+        hint('Use "progress" to see all requirements.');
         return;
       }
       if (target === 'B3') {
-        addLine('[ELEVATOR HESITATES] Research clearance required.', 'error-message');
-        hint('Talk to Marcus on B2 and gain 2 Truths to unlock B3.');
+        addLine('[ELEVATOR HESITATES] Research clearance requires investigation.', 'error-message');
+        if (!gameState.floorsUnlocked.B2) hint('Unlock B2 first.');
+        if (gameState._completedRequests < 5) hint('Complete ' + (5 - gameState._completedRequests) + ' more requests.');
+        if (gameState.met.marcus === 0) hint('Talk to Marcus Webb on B2.');
+        if (gameState.coherence < 50) hint('Coherence too low. Rest to ≥ 50%.');
+        if (gameState.notes.length < 4) hint('Need ' + (4 - gameState.notes.length) + ' more notes.');
+        var hasCF01 = gameState.files.some(function (f) { return f.id === 'CF-01' && f._read; });
+        if (!hasCF01) hint('Read CF-01 (from Marcus on B2).');
+        hint('Use "progress" for details.');
         return;
       }
       if (target === 'B4') {
-        addLine('[ELEVATOR HESITATES] Maintenance clearance required.', 'error-message');
-        hint('Purchase Keycard, talk to Sarah on B3, and gain 3 Truths to unlock B4.');
+        addLine('[ELEVATOR HESITATES] Maintenance clearance requires thorough investigation.', 'error-message');
+        if (!gameState.floorsUnlocked.B3) hint('Unlock B3 first.');
+        if (gameState._completedRequests < 8) hint('Complete ' + (8 - gameState._completedRequests) + ' more requests.');
+        if (gameState.met.sarah === 0) hint('Talk to Dr. Sarah Chen on B3.');
+        var hasKeycard = gameState.inventory.some(function (i) { return i.id === 'keycard'; });
+        if (!hasKeycard) hint('Purchase Keycard (120¢) from REQUISITION.');
+        if (gameState.notes.length < 7) hint('Need ' + (7 - gameState.notes.length) + ' more notes.');
+        if (gameState.truths < 2) hint('Need ' + (2 - gameState.truths) + ' more Truths.');
+        var hasCF02 = gameState.files.some(function (f) { return f.id === 'CF-02' && f._read; });
+        var hasCF07 = gameState.files.some(function (f) { return f.id === 'CF-07' && f._read; });
+        if (!hasCF02) hint('Read CF-02 (from Sarah).');
+        if (!hasCF07) hint('Read CF-07 (from Sarah).');
+        hint('Use "progress" for all requirements.');
         return;
       }
       if (target === 'B5') {
-        addLine('[ELEVATOR HESITATES] Maximum clearance required.', 'error-message');
-        hint('Requires: Keycard + Scanner + Pattern Complete (7→3→9) + 4 Truths.');
+        addLine('[ELEVATOR HESITATES] Maximum clearance requires complete investigation.', 'error-message');
+        if (!gameState.floorsUnlocked.B4) hint('Unlock B4 first.');
+        if (gameState._completedRequests < 12) hint('Complete ' + (12 - gameState._completedRequests) + ' more requests.');
+        if (gameState.met.janitor === 0) hint('Talk to Maintenance Unit 4 on B4.');
+        var hasScanner = gameState.inventory.some(function (i) { return i.id === 'scanner'; });
+        if (!hasScanner) hint('Purchase Bio-Scanner (150¢).');
+        var patternDone = gameState.dataChain && gameState.dataChain.done;
+        if (!patternDone) hint('Complete terminal pattern: access 7, 3, 9.');
+        if (gameState.coherence < 40) hint('Coherence too low. Rest to ≥ 40%.');
+        if (gameState.notes.length < 10) hint('Need ' + (10 - gameState.notes.length) + ' more notes.');
+        if (gameState.truths < 3) hint('Need ' + (3 - gameState.truths) + ' more Truths.');
+        var hasCF04 = gameState.files.some(function (f) { return f.id === 'CF-04' && f._read; });
+        if (!hasCF04) hint('Read CF-04 (from Janitor).');
+        hint('Use "progress" for complete checklist.');
         return;
       }
     }
 
-    if (
-      (target === 'B4' || target === 'B5') &&
-      !gameState.inventory.some(function (i) {
-        return i.id === 'keycard';
-      })
-    ) {
-      addLine('[ACCESS DENIED] Keycard required.', 'error-message');
+    // Physical keycard check for B4/B5
+    var hasKeycard = gameState.inventory.some(function (i) { return i.id === 'keycard'; });
+    if ((target === 'B4' || target === 'B5') && !hasKeycard) {
+      addLine('[ACCESS DENIED] Physical keycard required.', 'error-message');
+      hint('Purchase Access Keycard from REQUISITION for 120¢');
       return;
     }
 
     if (target === 'B5') {
-      if (
-        !gameState.inventory.some(function (i) {
-          return i.id === 'scanner';
-        })
-      ) {
+      var hasScanner = gameState.inventory.some(function (i) { return i.id === 'scanner'; });
+      if (!hasScanner) {
         addLine('[ACCESS DENIED] Bio-Scanner required for B5.', 'error-message');
-        return;
-      }
-      if (!gameState.dataChain || !gameState.dataChain.done) {
-        addLine('[ACCESS DENIED] Terminal pattern incomplete.', 'error-message');
-        hint('Complete the sequence: access terminals 7, then 3, then 9.');
-        return;
-      }
-      if (gameState.truths < 4) {
-        addLine('[ACCESS DENIED] Insufficient understanding.', 'error-message');
-        hint('Gain more Truths by talking to NPCs and reading files.');
+        hint('Purchase Bio-Scanner from REQUISITION for 150¢');
         return;
       }
     }
 
+    // Move successful
     gameState.floor = target;
     gameState.place = null;
     addLine('[Elevator descends to ' + target + ']', 'system-message');
@@ -295,18 +380,16 @@ function processCommand() {
 
     setTimeout(function () {
       if (target === 'B5') {
-        var loss = 7;
+        var loss = 8;
         gameState.coherence = Math.max(0, gameState.coherence - loss);
         addLine('[The pressure is overwhelming...] -' + loss + ' Coherence', 'error-message');
         playSound('glitch');
         flashGlitch();
 
-        if (gameState.coherence < 15) {
-          completeRequestIf('threshold', 'b5_ok');
+        if (gameState.coherence < 10) {
           triggerGameOver('B5 COHERENCE COLLAPSE');
           return;
         }
-        completeRequestIf('threshold', 'b5_ok');
       }
       doLook();
       updateDisplay();
@@ -323,23 +406,21 @@ function processCommand() {
 
     var a = arg.toLowerCase();
     var npc = Object.values(npcsData).find(function (n) {
-      return (
-        n.name.toLowerCase().indexOf(a) > -1 ||
-        (n.aliases &&
-          n.aliases.some(function (x) {
-            return a.indexOf(x) > -1;
-          })) ||
-        (n.role &&
-          n.role.some(function (x) {
-            return a.indexOf(x) > -1;
-          }))
-      );
+      return n.name.toLowerCase().indexOf(a) > -1 ||
+        (n.aliases && n.aliases.some(function (x) { return a.indexOf(x) > -1; })) ||
+        (n.role && n.role.some(function (x) { return a.indexOf(x) > -1; }));
     });
 
+    if (!npc) {
+      addLine('[No one answers to that name.]', 'error-message');
+      return;
+    }
+
+    // Echo special case
     if (npc === npcsData.echo) {
       if (!gameState.echoUnlocked) {
         addLine('(Silence. It is waiting for understanding, not insistence.)', 'thought');
-        hint('Echo requires: talk to Marcus & Sarah + complete pattern (7→3→9) + 4 Truths.');
+        hint('Echo requires: B5 unlocked + all NPCs contacted + Pattern complete + 4 Truths');
         return;
       }
       if (gameState.floor !== 'B5') {
@@ -350,22 +431,23 @@ function processCommand() {
       return;
     }
 
-    if (npc && !gameState.place && npc.location === gameState.floor) {
-      if (npc === npcsData.sarah) talkTo('sarah');
-      if (npc === npcsData.marcus) talkTo('marcus');
-      if (npc === npcsData.janitor) talkTo('janitor');
-
-      if (gameState.met.marcus > 0) tryUnlockB3();
-      if (gameState.met.sarah > 0) tryUnlockB4();
-      completeRequestIf('speak', npc.role[0]);
-      maybeUnlockEcho();
-      maybeUnlockB5ByWisdom();
-    } else if (gameState.place) {
+    // Regular NPC
+    if (gameState.place) {
       addLine('If someone is here, they do not answer me in places like this.', 'thought');
-    } else {
-      addLine('[No one answers to that name here.]', 'error-message');
-      hint('Make sure you are on the correct floor and the NPC is present.');
+      return;
     }
+
+    if (npc.location !== gameState.floor) {
+      addLine('[No one answers. ' + npc.name + ' is on ' + npc.location + '.]', 'error-message');
+      return;
+    }
+
+    if (!gameState.floorsUnlocked[npc.location]) {
+      addLine('[That floor is not accessible yet.]', 'error-message');
+      return;
+    }
+
+    talkTo(npc === npcsData.sarah ? 'sarah' : npc === npcsData.marcus ? 'marcus' : npc === npcsData.janitor ? 'janitor' : null);
     return;
   }
 
@@ -392,63 +474,23 @@ function processCommand() {
     addLine('[Terminal ' + tnum + ' accepts my hands...]', 'system-message');
 
     setTimeout(function () {
-      var pool = terminalLore[tnum] || [
-        'The screen refuses to agree with itself.',
-        'All it gives me is my reflection.'
-      ];
+      var pool = terminalLore[tnum] || ['The screen refuses to agree with itself.'];
       addLine(pool[Math.floor(Math.random() * pool.length)], 'system-message');
       playSound('error');
 
-      var loss = 6;
+      var loss = 5;
       gameState.coherence = Math.max(0, gameState.coherence - loss);
       addLine('[-' + loss + ' Coherence]', 'error-message');
 
-      // Initialize data chain only after accessing terminal 7, 3, or 9
-      if (!gameState.dataChain && (tnum === '7' || tnum === '3' || tnum === '9')) {
-        initDataChain();
-      }
+      processTerminalAccess(tnum);
+      completeRequestIf('terminals', tnum);
 
-      if (gameState.dataChain && !gameState.dataChain.done) {
-        var exp = gameState.dataChain.steps[gameState.dataChain.index];
-        if (Number(tnum) === exp) {
-          gameState.dataChain.index++;
-          think(
-            'One step closer: ' +
-              gameState.dataChain.index +
-              '/' +
-              gameState.dataChain.steps.length +
-              '.'
-          );
-
-          if (gameState.dataChain.index >= gameState.dataChain.steps.length) {
-            gameState.dataChain.done = true;
-            gameState.truths++;
-            addLine('[PATTERN COMPLETE] Something in me stops resisting.', 'success-message');
-            toast('Data Chain Complete', 'Pattern recognized', 'good');
-            createParticles(20, document.body);
-            hint('B5 access is now possible if you have Scanner, Keycard, and 4 Truths.');
-          }
-        } else if (tnum === '7' || tnum === '3' || tnum === '9') {
-          addLine('[Pattern broken. Must restart from terminal 7.]', 'error-message');
-          gameState.dataChain.index = 0;
-        }
-      }
-
-      completeRequestIf('fetch', tnum);
-      tryUnlockB2();
-      maybeUnlockEcho();
-      maybeUnlockB5ByWisdom();
-
-      // Win condition
-      if (
-        gameState.floorsUnlocked.B5 &&
-        gameState.floor === 'B5' &&
-        tnum === '9' &&
-        gameState.truths >= 3 &&
-        gameState.inventory.some(function (i) {
-          return i.id === 'scanner';
-        })
-      ) {
+      // WIN CONDITION
+      if (gameState.floorsUnlocked.B5 && 
+          gameState.floor === 'B5' && 
+          tnum === '9' && 
+          gameState.truths >= 4 && 
+          gameState.inventory.some(function (i) { return i.id === 'scanner'; })) {
         triggerWin();
         return;
       }
@@ -458,166 +500,82 @@ function processCommand() {
     return;
   }
 
-  if (cmdw === 'investigate') {
-    // Limit investigate usage
-    if (!gameState._investigateCount) gameState._investigateCount = 0;
-    if (gameState._investigateCount >= 5) {
-      addLine('[I have exhausted my investigation efforts here.]', 'thought');
-      return;
-    }
-    gameState._investigateCount++;
-
-    var topic = arg || 'anything';
-    addLine('[Investigating: ' + topic + ']', 'system-message');
-
-    if (Math.random() < 0.5) {
-      var fpool = fileBank.filter(function (f) {
-        return !gameState.files.find(function (x) {
-          return x.id === f.id;
-        });
-      });
-      if (fpool.length) {
-        var f = fpool[Math.floor(Math.random() * fpool.length)];
-        grantFile(f);
-      } else {
-        addLine('All accessible files are already collected.', 'thought');
-      }
-    } else {
-      addLine('Nothing yet, but the air feels generous.', 'thought');
-    }
-    return;
-  }
-
-  if (cmdw === 'forage') {
-    // Limit forage usage
-    if (!gameState._forageCount) gameState._forageCount = 0;
-    if (gameState._forageCount >= 6) {
-      addLine('[The drawers have been picked clean.]', 'thought');
-      return;
-    }
-    gameState._forageCount++;
-
-    var gain = 8 + Math.floor(Math.random() * 12);
-    gameState.credits += gain;
-    addLine('[Shaking drawers yields forgotten coins] +' + gain + '¢', 'success-message');
-    updateDisplay();
-    return;
-  }
-
-  if (cmdw === 'analyze') {
-    if (gameState.notes.length >= 3 || gameState.files.length >= 2) {
-      // Limit analyze to gain truth only once
-      if (gameState._analyzedOnce) {
-        addLine('[The patterns repeat themselves without new meaning.]', 'thought');
-        return;
-      }
-      gameState._analyzedOnce = true;
-      gameState.truths++;
-      addLine('[I align notes until a tone emerges] +1 Truth', 'success-message');
-      createParticles(12, $('#coherence').parentElement);
-    } else {
-      addLine('I need more material to analyze.', 'error-message');
-    }
-    updateDisplay();
-    return;
-  }
-
   if (cmdw === 'status') {
     addLine('=== PERSONAL STATUS ===', 'system-message');
     addLine('Name: Gerth');
-    addLine('Floor: ' + gameState.floor);
+    addLine('Floor: ' + gameState.floor + (gameState.place ? ' (' + gameState.place + ')' : ''));
     addLine('Coherence: ' + gameState.coherence + '%');
     addLine('Credits: ' + gameState.credits + '¢');
     addLine('Truths: ' + gameState.truths);
     addLine('Notes: ' + gameState.notes.length + '/16');
-    addLine('Files: ' + gameState.files.length + '/' + fileBank.length);
+    addLine('Files collected: ' + gameState.files.length + '/' + fileBank.length);
+    var filesRead = gameState.files.filter(function (f) { return f._read; }).length;
+    addLine('Files read: ' + filesRead + '/' + gameState.files.length);
     addLine('Inventory: ' + gameState.inventory.length + ' items');
+    gameState.inventory.forEach(function (item) {
+      addLine('  • ' + item.name);
+    });
     addLine('Completed Requests: ' + gameState._completedRequests);
     var unlocked = Object.keys(gameState.floorsUnlocked).filter(function (f) {
       return gameState.floorsUnlocked[f];
     });
     addLine('Floor Access: ' + unlocked.join(', '));
     if (gameState.dataChain) {
-      addLine(
-        'Pattern Progress: ' +
-          gameState.dataChain.index +
-          '/' +
-          gameState.dataChain.steps.length +
-          (gameState.dataChain.done ? ' [COMPLETE]' : '')
-      );
+      var pattern = gameState._terminalPattern.length > 0 ? gameState._terminalPattern.join('→') : 'Not started';
+      addLine('Pattern Progress: ' + pattern + (gameState.dataChain.done ? ' [COMPLETE]' : ' (need: 7→3→9)'));
     }
     return;
   }
 
   if (cmdw === 'work') {
-    var pay = 18 + Math.floor(Math.random() * 19);
-    var loss = 2 + Math.floor(Math.random() * 2);
+    var pay = 25 + Math.floor(Math.random() * 20);
+    var loss = 3;
     addLine('[Paper bites my fingers...]', 'system-message');
     gameState.credits += pay;
     gameState.coherence = Math.max(0, gameState.coherence - loss);
     addLine('[+' + pay + '¢] [-' + loss + ' Coherence]', 'success-message');
-    completeRequestIf('fix');
-    completeRequestIf('report');
+    completeRequestIf('work');
     updateDisplay();
     return;
   }
 
   if (cmdw === 'rest') {
-    var gain = 8 + Math.floor(Math.random() * 5);
+    var gain = 12 + Math.floor(Math.random() * 6);
     gameState.coherence = Math.min(100, gameState.coherence + gain);
-    completeRequestIf('compose', 'calm_ok');
-    addLine(
-      '[I count breaths until the walls agree with me] +' + gain + ' Coherence',
-      'success-message'
-    );
+    addLine('[I count breaths until the walls agree with me] +' + gain + ' Coherence', 'success-message');
     createParticles(10, $('#coherence').parentElement);
-    updateDisplay();
-    return;
-  }
-
-  if (cmdw === 'hack') {
-    // Limit hack usage
-    if (!gameState._hackCount) gameState._hackCount = 0;
-    if (gameState._hackCount >= 4) {
-      addLine('[The terminals have learned my tricks.]', 'error-message');
-      return;
-    }
-    gameState._hackCount++;
-
-    if (gameState.credits < 20) {
-      addLine('I need a small stake to risk.', 'error-message');
-      return;
-    }
-    gameState.credits -= 20;
-    var p = Math.random();
-    if (p < 0.1) {
-      gameState.credits += 180;
-      addLine('[The machine blushes and pays out] +180¢', 'success-message');
-      playSound('success');
-    } else if (p < 0.35) {
-      gameState.credits += 40;
-      addLine('[Loose change in the circuitry] +40¢', 'success-message');
-    } else {
-      addLine('[The cursor laughs without sound]', 'error-message');
-      gameState.coherence = Math.max(0, gameState.coherence - 4);
-      addLine('[-4 Coherence]', 'error-message');
-    }
+    
+    gameState.requests.forEach(function (r) {
+      if (r.kind === 'rest' && r.meta.targetCoherence && gameState.coherence >= r.meta.targetCoherence) {
+        if (r.progress < r.goal) {
+          r.progress = r.goal;
+          finishRequest(r);
+        }
+      }
+    });
+    
+    // Check unlocks after resting
+    tryUnlockB2();
+    tryUnlockB3();
+    tryUnlockB5();
+    
     updateDisplay();
     return;
   }
 
   if (cmdw === 'clean') {
-    if (!gameState.floorsUnlocked.B4 || gameState.floor !== 'B4') {
+    if (gameState.floor !== 'B4') {
       addLine('Mops do not follow me to other floors.', 'error-message');
       return;
     }
-    var tip = 14 + Math.floor(Math.random() * 13);
+    if (!gameState.floorsUnlocked.B4) {
+      addLine('Maintenance level is not accessible yet.', 'error-message');
+      return;
+    }
+    var tip = 18 + Math.floor(Math.random() * 15);
     gameState.credits += tip;
-    addLine(
-      '[I push the bucket until the corridor stops complaining] +' + tip + '¢',
-      'success-message'
-    );
-    gameState.janitorTrust = Math.min(100, gameState.janitorTrust + 8);
+    addLine('[I push the bucket until the corridor stops complaining] +' + tip + '¢', 'success-message');
+    gameState.janitorTrust = Math.min(100, gameState.janitorTrust + 10);
     completeRequestIf('clean');
     updateDisplay();
     return;

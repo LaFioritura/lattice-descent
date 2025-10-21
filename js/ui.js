@@ -1,5 +1,5 @@
 /* ===========================
-   NEXUS PROTOCOL - UI System
+   NEXUS PROTOCOL - UI System (FIXED)
    =========================== */
 
 function $(sel) {
@@ -107,10 +107,10 @@ function updateCoherenceLED() {
     symbol.textContent = '●';
   } else if (coh >= 40) {
     led.classList.add('yellow');
-    symbol.textContent = '◐';
+    symbol.textContent = '●';
   } else if (coh >= 20) {
     led.classList.add('red', 'pulse');
-    symbol.textContent = '◑';
+    symbol.textContent = '◐';
   } else {
     led.classList.add('red', 'pulse');
     symbol.textContent = '○';
@@ -121,8 +121,8 @@ function updateDisplay() {
   $('#floor').textContent = gameState.floor;
   animateNumber($('#coherence'), Math.max(0, Math.min(100, Math.round(gameState.coherence))));
   animateNumber($('#credits'), gameState.credits);
-  var mins = ('0' + Math.floor(gameState.time / 60)).slice(-2),
-    secs = ('0' + (gameState.time % 60)).slice(-2);
+  var mins = ('0' + Math.floor(gameState.time / 60)).slice(-2);
+  var secs = ('0' + (gameState.time % 60)).slice(-2);
   $('#gameTime').textContent = mins + ':' + secs;
 
   updateCoherenceLED();
@@ -151,9 +151,7 @@ function rosterByFloor() {
     B2: gameState.floorsUnlocked.B2 ? [npcsData.marcus.name] : [],
     B3: gameState.floorsUnlocked.B3 ? [npcsData.sarah.name] : [],
     B4: gameState.floorsUnlocked.B4 ? [npcsData.janitor.name] : [],
-    B5: gameState.floorsUnlocked.B5
-      ? [gameState.echoUnlocked ? 'Echo (listens)' : '(hush)']
-      : []
+    B5: gameState.floorsUnlocked.B5 ? [gameState.echoUnlocked ? 'Echo (listens)' : '(hush)'] : []
   };
 }
 
@@ -164,24 +162,45 @@ function updateHUD() {
   $('#hudLogs').textContent = gameState.notes.length + '/16';
   $('#hudAch').textContent = gameState.achCount;
   $('#barCoherence').style.width = Math.max(0, Math.min(100, gameState.coherence)) + '%';
-  var c = Math.min(400, gameState.credits);
-  $('#barCredits').style.width = c / 4 + '%';
-  $('#barProgress').style.width = Math.min(100, gameState.truths * 20) + '%';
+  
+  var maxCredits = 500;
+  var creditPercent = Math.min(100, (gameState.credits / maxCredits) * 100);
+  $('#barCredits').style.width = creditPercent + '%';
+  
+  var truthPercent = Math.min(100, (gameState.truths / 5) * 100);
+  $('#barProgress').style.width = truthPercent + '%';
+  
   var floors = ['B5', 'B4', 'B3', 'B2', 'B1'];
   var roster = rosterByFloor();
-  var map = floors
-    .map(function (f) {
-      var mark = f === gameState.floor ? '> ' : '  ';
-      var line = mark + f + (f === gameState.floor ? ' <' : '');
-      if (!gameState.floorsUnlocked[f]) line += ' [locked]';
-      var names = (roster[f] || []).join(', ');
-      return names ? line + ' — ' + names : line;
-    })
-    .join('\n');
+  var map = floors.map(function (f) {
+    var mark = f === gameState.floor ? '> ' : '  ';
+    var line = mark + f + (f === gameState.floor ? ' <' : '');
+    if (!gameState.floorsUnlocked[f]) line += ' [LOCKED]';
+    var names = (roster[f] || []).join(', ');
+    return names ? line + ' — ' + names : line;
+  }).join('\n');
+  
   map += gameState.place ? '\n[' + gameState.place + ']' : '';
   $('#minimap').textContent = map;
-  $('#legendBox').innerHTML =
-    'Legend: Coherence = mental clarity (keep above 0). Truths = understanding. Notes/Files = clues. Use <code>who</code> for people.';
+  
+  // Updated legend with clear progression info
+  var nextGoal = '';
+  if (!gameState.floorsUnlocked.B2) {
+    nextGoal = 'Next: Complete ' + (3 - gameState._completedRequests) + ' requests + gain 1 Truth';
+  } else if (!gameState.floorsUnlocked.B3) {
+    nextGoal = 'Next: Talk to Marcus + ' + (5 - gameState._completedRequests) + ' more requests + ' + (2 - gameState.truths) + ' Truths';
+  } else if (!gameState.floorsUnlocked.B4) {
+    var hasKey = gameState.inventory.some(function (i) { return i.id === 'keycard'; });
+    nextGoal = 'Next: ' + (hasKey ? '✓' : 'Buy') + ' Keycard + Talk to Sarah + ' + (3 - gameState.truths) + ' Truths';
+  } else if (!gameState.floorsUnlocked.B5) {
+    var hasScanner = gameState.inventory.some(function (i) { return i.id === 'scanner'; });
+    var patternDone = gameState.dataChain && gameState.dataChain.done;
+    nextGoal = 'Next: ' + (hasScanner ? '✓' : 'Buy') + ' Scanner + ' + (patternDone ? '✓' : 'Complete') + ' Pattern + Talk to Janitor + ' + (4 - gameState.truths) + ' Truths';
+  } else {
+    nextGoal = 'Final: Access terminal 9 on B5 with Scanner + 3 Truths';
+  }
+  
+  $('#legendBox').innerHTML = '<strong>Current Goal:</strong> ' + nextGoal + '<br><code>progress</code> for full details';
 }
 
 function makeChoices(choices) {
@@ -205,14 +224,8 @@ function makeChoices(choices) {
           addLine('[+' + ch.effects.credits + '¢]', 'success-message');
         }
         if (ch.effects.coherence) {
-          gameState.coherence = Math.max(
-            0,
-            Math.min(100, gameState.coherence + ch.effects.coherence)
-          );
-          addLine(
-            '[' + (ch.effects.coherence > 0 ? '+' : '') + ch.effects.coherence + ' Coherence]',
-            'system-message'
-          );
+          gameState.coherence = Math.max(0, Math.min(100, gameState.coherence + ch.effects.coherence));
+          addLine('[' + (ch.effects.coherence > 0 ? '+' : '') + ch.effects.coherence + ' Coherence]', 'system-message');
         }
         if (ch.effects.trustJanitor) {
           gameState.janitorTrust = Math.min(100, gameState.janitorTrust + ch.effects.trustJanitor);
@@ -228,30 +241,38 @@ function makeChoices(choices) {
 }
 
 function openShop() {
-  var modal = $('#shopModal'),
-    content = $('#shopContent');
+  var modal = $('#shopModal');
+  var content = $('#shopContent');
+  
   function render() {
-    content.innerHTML = '<p>Available Credits: ' + gameState.credits + '¢</p>';
+    content.innerHTML = '<p style="margin-bottom:15px;">Available Credits: <strong>' + gameState.credits + '¢</strong></p>';
+    
     shopItems.forEach(function (it) {
-      var owned = gameState.inventory.some(function (i) {
-        return i.id === it.id;
-      });
+      var owned = gameState.inventory.some(function (i) { return i.id === it.id; });
       var div = document.createElement('div');
       div.className = 'item-card';
-      div.innerHTML =
-        '<h3>' +
-        it.name +
-        (owned ? ' [OWNED]' : '') +
-        '</h3><p>' +
-        it.effect +
-        '</p><p>Price: ' +
-        it.price +
-        '¢</p>';
+      
+      var statusText = '';
       if (owned) {
+        if (it.consumable) {
+          statusText = ' [OWNED - Usable]';
+        } else {
+          statusText = ' [OWNED]';
+        }
+      }
+      
+      div.innerHTML = '<h3>' + it.name + statusText + '</h3>' +
+                      '<p>' + it.effect + '</p>' +
+                      '<p><strong>Price: ' + it.price + '¢</strong></p>';
+      
+      // Allow buying consumables multiple times
+      if (owned && !it.consumable) {
         div.style.opacity = '0.6';
         div.style.cursor = 'default';
-        return content.appendChild(div);
+        content.appendChild(div);
+        return;
       }
+      
       div.onclick = function () {
         if (gameState.credits >= it.price) {
           gameState.credits -= it.price;
@@ -262,15 +283,18 @@ function openShop() {
           createParticles(12, div);
           render();
           updateDisplay();
-          maybeUnlockB5ByWisdom();
+          
+          // Check progression after purchase
           if (it.id === 'keycard') {
+            hint('Keycard acquired. Use "use keycard" to activate access.');
             tryUnlockB4();
           }
           if (it.id === 'scanner') {
-            hint('Scanner equipped. Try: use scanner');
+            hint('Scanner equipped. Use "use scanner" to detect patterns.');
+            tryUnlockB5();
           }
         } else {
-          addLine('Insufficient clearance.', 'error-message');
+          addLine('Insufficient clearance. Need ' + (it.price - gameState.credits) + '¢ more.', 'error-message');
           playSound('error');
           toast('Purchase failed', 'Not enough credits', 'bad');
         }
@@ -278,26 +302,25 @@ function openShop() {
       content.appendChild(div);
     });
   }
+  
   render();
   modal.style.display = 'block';
 }
 
 function openInventory() {
-  var modal = $('#inventoryModal'),
-    content = $('#inventoryContent');
+  var modal = $('#inventoryModal');
+  var content = $('#inventoryContent');
+  
   if (gameState.inventory.length === 0) {
-    content.innerHTML = '<p>No items in inventory</p>';
+    content.innerHTML = '<p>No items in inventory. Visit REQUISITION to purchase equipment.</p>';
   } else {
     content.innerHTML = '';
     gameState.inventory.forEach(function (item) {
       var div = document.createElement('div');
       div.className = 'item-card';
-      div.innerHTML =
-        '<h3>' +
-        item.name +
-        '</h3><p>' +
-        item.effect +
-        '</p><p style="color:#00ff41;font-size:12px;">Click to use</p>';
+      div.innerHTML = '<h3>' + item.name + '</h3>' +
+                      '<p>' + item.effect + '</p>' +
+                      '<p style="color:#00ff41;font-size:12px;">Click to use</p>';
       div.onclick = function () {
         modal.style.display = 'none';
         useItem(item.name);
