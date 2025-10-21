@@ -1,5 +1,5 @@
 /* ===========================
-   NEXUS PROTOCOL - Main Entry
+   NEXUS PROTOCOL - Main Entry (COMPLETE)
    =========================== */
 
 (function () {
@@ -124,7 +124,7 @@
 
   function startGame() {
     addLine('=================================', 'system-message');
-    addLine('NEXUS PROTOCOL v3.7.1 — Enhanced', 'system-message');
+    addLine('NEXUS PROTOCOL v4.0 — Meritocratic', 'system-message');
     addLine('=================================');
     addLine('');
     addLine('Welcome back, Gerth.');
@@ -133,30 +133,44 @@
     addLine('You are on Floor B1 — Administrative.');
     addLine('Your terminal keeps making eye contact.');
     addLine('');
-    hint('Type "help" for commands. Start with "look" and "requests".');
+    addLine('=== PROGRESSION GUIDE ===', 'system-message');
+    addLine('• Complete REQUESTS to earn credits and unlock floors');
+    addLine('• Talk to NPCs to gain TRUTHS (required for progression)');
+    addLine('• Use SCAN to find notes on each floor');
+    addLine('• Access terminals to gather data and complete the pattern (7→3→9)');
+    addLine('• Purchase KEYCARD (120¢) and SCANNER (150¢) for deeper access');
+    addLine('');
+    hint('Type "help" for commands. Use "progress" to see unlock requirements.');
+    hint('Start with: look, requests, work');
     addLine('[Orientation stipend] +50¢', 'success-message');
 
     gameState.credits += 50;
     updateDisplay();
     fillRequests();
 
-    // Game loop
+    // Game loop - more balanced
     setInterval(function () {
       if (gameState.gameOver) return;
       try {
         gameState.time++;
 
-        // Passive effects
-        if (gameState.time % 120 === 0) {
+        // Slower passive coherence decay (every 3 minutes)
+        if (gameState.time % 180 === 0) {
           gameState.coherence = Math.max(0, gameState.coherence - 1);
-          gameState.credits += 5;
+        }
+
+        // Small passive credit gain (every 2 minutes)
+        if (gameState.time % 120 === 0) {
+          gameState.credits += 3;
         }
 
         // Ambient sound
-        if (gameState.time % 30 === 0 && Math.random() < 0.3) playSound('ambient');
+        if (gameState.time % 40 === 0 && Math.random() < 0.2) {
+          playSound('ambient');
+        }
 
-        // Random events
-        if (gameState.time % 180 === 0 && gameState.time - gameState._lastEventTime >= 180) {
+        // Atmospheric events (less frequent)
+        if (gameState.time % 300 === 0 && gameState.time - gameState._lastEventTime >= 300) {
           var events = [
             'The walls whisper names that do not belong to anyone.',
             'A corridor decides to be longer.',
@@ -167,6 +181,20 @@
           addLine(msg, 'error-message');
           tick(msg);
           gameState._lastEventTime = gameState.time;
+        }
+
+        // Tutorial hints
+        if (gameState.time === 30 && gameState._completedRequests === 0) {
+          hint('Try "work" to earn credits, or "visit archives" to explore.');
+        }
+
+        if (gameState.time === 90 && !gameState.floorsUnlocked.B2) {
+          hint('Complete requests to progress. Use "requests" to see active tasks.');
+        }
+
+        if (gameState._completedRequests === 3 && gameState.truths === 0) {
+          hint('You have completed 3 requests! Now you need 1 Truth to unlock B2.');
+          hint('Truths are gained by talking to NPCs. B2 will unlock, then talk to Marcus.');
         }
 
         updateDisplay();
