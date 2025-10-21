@@ -554,14 +554,11 @@ function processCommand() {
   addLine('Command not recognized. Type "help" for available commands.', 'error-message');
 
 }
-if (!validateActionContext("forage")) {
-  addLine("You can't forage right now. Invalid context.", "error-message");
-  return;
+
 }
 }
-if (!validateActionContext("investigate")) {
-  addLine("You find nothing. You need a decoder and ritual access.", "error-message");
-  return;
+
 }
+
 
 
