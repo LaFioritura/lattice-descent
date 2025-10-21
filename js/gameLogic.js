@@ -657,26 +657,4 @@ function talkTo(npcId) {
     ]);
   }
   updateDisplay();
-
-}
-function validateActionContext(action) {
-  const validContexts = {
-    forage: { floor: "B1", requiredItem: "scanner", oncePerCycle: true },
-    investigate: { floor: "B3", requiredItem: "decoder", quest: "echo-initiation" }
-  };
-
-  const ctx = validContexts[action];
-  if (!ctx) return true;
-
-  if (ctx.floor && playerState.floor !== ctx.floor) return false;
-  if (ctx.requiredItem && !playerState.items?.includes(ctx.requiredItem)) return false;
-  if (ctx.quest && quests?.[ctx.quest]?.status !== "completed") return false;
-  if (ctx.oncePerCycle && playerState.usedActions?.includes(action)) return false;
-
-  if (ctx.oncePerCycle) {
-    if (!playerState.usedActions) playerState.usedActions = [];
-    playerState.usedActions.push(action);
-  }
-
-  return true;
 }

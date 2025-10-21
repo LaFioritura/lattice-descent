@@ -552,13 +552,4 @@ function processCommand() {
   }
 
   addLine('Command not recognized. Type "help" for available commands.', 'error-message');
-
 }
-
-}
-}
-
-}
-
-
-
