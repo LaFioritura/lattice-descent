@@ -552,4 +552,9 @@ function processCommand() {
   }
 
   addLine('Command not recognized. Type "help" for available commands.', 'error-message');
+
+}
+if (!validateActionContext("forage")) {
+  log("Non puoi foraggiare ora. Contesto non valido.");
+  return;
 }
