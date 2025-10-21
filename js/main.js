@@ -1,5 +1,5 @@
 /* ===========================
-   NEXUS PROTOCOL - Main Entry (COMPLETE)
+   NEXUS PROTOCOL - Main Entry (MISSION SYSTEM v2)
    =========================== */
 
 (function () {
@@ -104,7 +104,7 @@
       }
     });
 
-    // Audio initialization on first interaction
+    // Audio initialization
     document.addEventListener('click', function once() {
       initAudio();
       if (gameState.soundEnabled && !ambientSystem.started) {
@@ -123,9 +123,10 @@
   }
 
   function startGame() {
-    addLine('=================================', 'system-message');
-    addLine('NEXUS PROTOCOL v4.0 — Meritocratic', 'system-message');
-    addLine('=================================');
+    addLine('═════════════════════════════════', 'system-message');
+    addLine('  NEXUS PROTOCOL v4.0', 'system-message');
+    addLine('  Mission System Active', 'system-message');
+    addLine('═════════════════════════════════', 'system-message');
     addLine('');
     addLine('Welcome back, Gerth.');
     addLine('The building remembers you one floor at a time.');
@@ -133,33 +134,39 @@
     addLine('You are on Floor B1 — Administrative.');
     addLine('Your terminal keeps making eye contact.');
     addLine('');
-    addLine('=== PROGRESSION GUIDE ===', 'system-message');
-    addLine('• Complete REQUESTS to earn credits and unlock floors');
-    addLine('• Talk to NPCs to gain TRUTHS (required for progression)');
-    addLine('• Use SCAN to find notes on each floor');
-    addLine('• Access terminals to gather data and complete the pattern (7→3→9)');
-    addLine('• Purchase KEYCARD (120¢) and SCANNER (150¢) for deeper access');
-    addLine('');
-    hint('Type "help" for commands. Use "progress" to see unlock requirements.');
-    hint('Start with: look, requests, work');
+    
+    // Show first mission
+    var firstMission = missions[gameState.activeMission];
+    if (firstMission) {
+      addLine('═══ MISSION ASSIGNED ═══', 'success-message');
+      addLine(firstMission.title, 'success-message');
+      addLine(firstMission.briefing, 'system-message');
+      addLine('');
+    }
+    
+    hint('Type "mission" to see your objectives');
+    hint('Type "help" for all commands');
     addLine('[Orientation stipend] +50¢', 'success-message');
 
     gameState.credits += 50;
-    updateDisplay();
+    
+    // Initialize side requests (optional)
     fillRequests();
+    
+    updateDisplay();
 
-    // Game loop - more balanced
+    // Game loop
     setInterval(function () {
       if (gameState.gameOver) return;
       try {
         gameState.time++;
 
-        // Slower passive coherence decay (every 3 minutes)
+        // Slower passive coherence decay
         if (gameState.time % 180 === 0) {
           gameState.coherence = Math.max(0, gameState.coherence - 1);
         }
 
-        // Small passive credit gain (every 2 minutes)
+        // Small passive credit gain
         if (gameState.time % 120 === 0) {
           gameState.credits += 3;
         }
@@ -169,7 +176,7 @@
           playSound('ambient');
         }
 
-        // Atmospheric events (less frequent)
+        // Atmospheric events
         if (gameState.time % 300 === 0 && gameState.time - gameState._lastEventTime >= 300) {
           var events = [
             'The walls whisper names that do not belong to anyone.',
@@ -184,17 +191,27 @@
         }
 
         // Tutorial hints
-        if (gameState.time === 30 && gameState._completedRequests === 0) {
-          hint('Try "work" to earn credits, or "visit archives" to explore.');
+        if (gameState.time === 60 && gameState.activeMission === 'M_B1_DUPLICATE') {
+          var mission = getCurrentMission();
+          var hasStarted = false;
+          for (var key in mission.objectives) {
+            if (mission.objectives[key].done) {
+              hasStarted = true;
+              break;
+            }
+          }
+          if (!hasStarted) {
+            hint('Start your mission: visit archives to begin investigation');
+          }
         }
 
-        if (gameState.time === 90 && !gameState.floorsUnlocked.B2) {
-          hint('Complete requests to progress. Use "requests" to see active tasks.');
+        if (gameState.time === 150 && gameState.activeMission === 'M_B1_DUPLICATE') {
+          hint('Use "mission" to track your progress anytime');
         }
 
-        if (gameState._completedRequests === 3 && gameState.truths === 0) {
-          hint('You have completed 3 requests! Now you need 1 Truth to unlock B2.');
-          hint('Truths are gained by talking to NPCs. B2 will unlock, then talk to Marcus.');
+        // Check mission progress periodically
+        if (gameState.time % 30 === 0) {
+          checkAllMissionProgress();
         }
 
         updateDisplay();

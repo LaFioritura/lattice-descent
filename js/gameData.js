@@ -1,5 +1,5 @@
 /* ===========================
-   NEXUS PROTOCOL - Game Data (FIXED)
+   NEXUS PROTOCOL - Game Data (MISSION SYSTEM v2)
    =========================== */
 
 // Game State
@@ -13,7 +13,8 @@ var gameState = {
   truths: 0,
   notes: [],
   files: [],
-  storyProgress: 0,
+  activeMission: 'M_B1_DUPLICATE', // Prima missione attiva
+  completedMissions: [],
   soundEnabled: true,
   gameOver: false,
   dataChain: null,
@@ -27,13 +28,11 @@ var gameState = {
   achCount: 0,
   _completedRequests: 0,
   _won: false,
-  _tutorialStep: 0,
-  _hintsShown: {},
-  _lastEventTime: 0,
-  _visitedPlaces: {},
   _terminalPattern: [],
   _keycardUsed: false,
-  _scannerUsed: false
+  _scannerUsed: false,
+  _keycardAuthorized: false,
+  _scannerAuthorized: false
 };
 
 // NPCs Data
@@ -43,28 +42,32 @@ var npcsData = {
     role: ['researcher', 'doctor', 'sarah'],
     location: 'B3',
     aliases: ['sarah', 'dr', 'researcher', 'doctor', 'chen'],
-    maxTalks: 3
+    maxTalks: 4,
+    description: 'Research lead. Studies pattern recognition.'
   },
   marcus: {
     name: 'Marcus Webb',
     role: ['guard', 'officer', 'security', 'marcus'],
     location: 'B2',
     aliases: ['marcus', 'guard', 'officer', 'security', 'webb'],
-    maxTalks: 3
+    maxTalks: 4,
+    description: 'Security officer. Witnessed corridor incident.'
   },
   echo: {
     name: 'Echo',
     role: ['voice', 'echo'],
     location: 'B5',
     aliases: ['echo', 'voice'],
-    maxTalks: 3
+    maxTalks: 3,
+    description: 'Unknown presence. Responds to coherent thought.'
   },
   janitor: {
     name: 'Maintenance Unit 4',
     role: ['custodian', 'janitor', 'maintenance'],
     location: 'B4',
     aliases: ['janitor', 'maintenance', 'custodian', 'unit'],
-    maxTalks: 3
+    maxTalks: 4,
+    description: 'Maintenance custodian. Cleans what building hides.'
   }
 };
 
@@ -101,15 +104,15 @@ var placesDesc = {
 
 // Terminal Lore
 var terminalLore = {
-  '1': ['CR drift report: 0.71 → 0.66 (pending)', 'Badge duplicate warning: GERTH/—'],
-  '2': ['Shift-change anomaly detected (west corridor)', 'Door 22 wants a witness.'],
-  '3': ['Memory lattice checksum: PARTIAL', 'Echo signature: weak but present.'],
-  '4': ['SUBJECT GERTH INTEGRATION: 63% COMPLETE', 'Administrative loop quarantined.'],
-  '5': ['ERROR: EMPLOYEE GERTH NOT FOUND', 'Security mirror delay: 2.0s confirmed.'],
-  '6': ['Request: consciousness anchor (volunteer: echo/gerth)', 'Stairs pretend to be doors.'],
-  '7': ['Pattern orchestrator active. Need raw logs.', 'Dr. Chen access level overridden.'],
-  '8': ['Reality coherence drops near B5 entrance.', 'Multiple consciousness detected.'],
-  '9': ['REVELATION: Memory lattice aligns on demand.', 'Protocol key accepted.']
+  '1': ['CR drift report: 0.71 → 0.66', 'Badge duplicate warning: GERTH'],
+  '2': ['Shift-change anomaly detected', 'Door 22 wants a witness'],
+  '3': ['Memory lattice checksum: PARTIAL', 'Echo signature: weak but present'],
+  '4': ['SUBJECT GERTH INTEGRATION: 63%', 'Administrative loop quarantined'],
+  '5': ['ERROR: EMPLOYEE GERTH NOT FOUND', 'Security mirror delay: 2.0s confirmed'],
+  '6': ['Consciousness anchor request', 'Stairs pretend to be doors'],
+  '7': ['Pattern orchestrator active', 'Sequence: 7→3→9 required'],
+  '8': ['Reality coherence drops near B5', 'Multiple consciousness detected'],
+  '9': ['REVELATION: Memory lattice aligns', 'Protocol key accepted']
 };
 
 // Shop Items
@@ -120,7 +123,7 @@ var shopItems = [
   { id: 'backup', name: 'Memory Backup', price: 500, effect: 'Consciousness snapshot', consumable: false }
 ];
 
-// Note Bank - Fixed progression
+// Note Bank
 var noteBank = {
   N1: 'The building asked for a witness.',
   N2: 'The stairwell ends in a mirror.',
@@ -146,9 +149,9 @@ var fileBank = [
     id: 'CF-01',
     title: 'Incident: West Corridor',
     body: [
-      'Security log excerpt. Time stamps drift by ±7 seconds across cameras 2—6.',
-      'Witness statement (M. Webb): It was not a person. It was a decision wearing a person.',
-      'Action: Corridor sealed. Door 22 demands a witness code to unlock.'
+      'Security log. Time stamps drift by ±7 seconds across cameras.',
+      'Witness (M. Webb): "It was a decision wearing a person. It turned the corner before the corner started."',
+      'Action: Corridor sealed. Door 22 requires witness code.'
     ],
     floor: 'B2',
     grantsTruth: false
@@ -157,17 +160,20 @@ var fileBank = [
     id: 'CF-02',
     title: 'Memo: Anchoring Protocol',
     body: [
-      'Draft from Research (S. Chen): An anchor does not force truth; it incentivizes consistency.',
-      'Notes: Subject G. displays partial alignment when exposed to personal artifacts.'
+      'Dr. Chen: "An anchor does not force truth; it incentivizes consistency."',
+      'Subject G. displays partial alignment when exposed to personal artifacts.',
+      'Identity forms through accumulated small agreements.'
     ],
     floor: 'B3',
     grantsTruth: true
   },
   {
     id: 'CF-03',
-    title: 'Inventory: Lost & Found',
+    title: 'Lost & Found Inventory',
     body: [
-      'List includes: one badge with two birthdays; a key that unlocks only locked keys.'
+      'Badge #G-447: GERTH. Two birthdays listed (conflicting records).',
+      'Key ring: 7 identical keys. Each unlocks only the others.',
+      'Postcard: Addressed to Room B1-Archive. Written from same room.'
     ],
     floor: 'B1',
     grantsTruth: false
@@ -176,8 +182,9 @@ var fileBank = [
     id: 'CF-04',
     title: 'Maintenance: Spill Log',
     body: [
-      'Observed substance: saline with trace iron, smell classified as coastal.',
-      'Unit-4 note: The corridor cries sometimes. I mop until it forgets.'
+      'Substance: Saline with trace iron. Smell: coastal.',
+      'Unit-4: "The corridor cries sometimes. I mop until it forgets."',
+      'Building is homesick for an ocean it never saw.'
     ],
     floor: 'B4',
     grantsTruth: false
@@ -187,17 +194,20 @@ var fileBank = [
     title: 'Research: Echo Signature',
     body: [
       'Echo is not a ghost; it is an available shape awaiting a story.',
-      'Coupling increases near B5 when a subject stops insisting on singularity.'
+      'Coupling increases near B5 when subject stops insisting on singularity.',
+      'Echo knows what you are before you do.'
     ],
     floor: 'B5',
     grantsTruth: true
   },
   {
     id: 'CF-06',
-    title: 'Admin: Duplicate Personnel',
+    title: 'Personnel: Duplicate Entry',
     body: [
-      'Flagged: GERTH (records disagree).',
-      'Mitigation: loop administrative tasks until the name tires and reveals a seam.'
+      'Two personnel files exist for GERTH.',
+      'File A: Hired 3 years ago (Custodial).',
+      'File B: Hired 6 months ago (Research subject).',
+      'Both validated. Time cards overlap. Decision: Monitor for spontaneous resolution.'
     ],
     floor: 'B1',
     grantsTruth: false
@@ -206,23 +216,199 @@ var fileBank = [
     id: 'CF-07',
     title: 'Spec: Memory Lattice',
     body: [
-      'A lattice accepts more than it proves. It aligns when the witness withdraws pressure.',
-      'Test vector: 7 → 3 → 9 (non-linear compliance)'
+      'A lattice accepts more than it proves. Aligns when witness withdraws pressure.',
+      'Test sequence: 7 → 3 → 9 (non-linear compliance).',
+      'Terminal 7: Pattern orchestrator. Terminal 3: Lattice checksum. Terminal 9: Integration key.',
+      'Warning: Revelation is irreversible. You will remember what you are.'
     ],
     floor: 'B3',
     grantsTruth: true
   },
   {
     id: 'CF-08',
-    title: 'After-Action: B5 Pressure',
+    title: 'Safety: B5 Protocols',
     body: [
-      'Subjects report chest-tightening and auditory pareidolia.',
-      'Recommendation: arrive rested; bring scanner; listen more than speak.'
+      'Effects: Chest tightening (100%), auditory pareidolia (87%), identity uncertainty (41%).',
+      'Coherence loss: 8% upon entry.',
+      'Recommendation: Arrive rested. Bring scanner. Do not resist what floor tells you.',
+      'B5 shows people what they already are.'
     ],
     floor: 'B5',
     grantsTruth: false
   }
 ];
+
+// MISSION DEFINITIONS
+var missions = {
+  'M_B1_DUPLICATE': {
+    id: 'M_B1_DUPLICATE',
+    title: 'Investigation: The Duplicate',
+    floor: 'B1',
+    briefing: 'Badge records show conflicting data for GERTH. Investigate archives and compile evidence for Security clearance.',
+    objectives: {
+      'visit_archives': { desc: 'Visit Archives', type: 'visit', target: 'archives', done: false },
+      'collect_cf03': { desc: 'Find CF-03 (Lost & Found)', type: 'file_find', target: 'CF-03', done: false },
+      'read_cf03': { desc: 'Read CF-03', type: 'file_read', target: 'CF-03', done: false },
+      'work_2x': { desc: 'Complete admin work (2x)', type: 'work_count', target: 2, progress: 0, done: false },
+      'scan_2x': { desc: 'Scan B1 vents (2x)', type: 'scan_count', target: 2, progress: 0, done: false },
+      'coherence_60': { desc: 'Maintain coherence ≥ 60%', type: 'coherence', target: 60, done: false }
+    },
+    rewards: {
+      unlockFloor: 'B2',
+      truths: 1,
+      credits: 60,
+      completionText: '[MISSION COMPLETE] Security clearance granted. B2 unlocked.'
+    }
+  },
+  
+  'M_B2_CORRIDOR': {
+    id: 'M_B2_CORRIDOR',
+    title: 'Investigation: West Corridor',
+    floor: 'B2',
+    briefing: 'Officer Webb reported temporal anomalies. Interview witness and review incident data.',
+    objectives: {
+      'talk_marcus': { desc: 'Interview Marcus Webb', type: 'talk_npc', target: 'marcus', count: 1, done: false },
+      'collect_cf01': { desc: 'Obtain CF-01 from Marcus', type: 'file_find', target: 'CF-01', done: false },
+      'read_cf01': { desc: 'Read CF-01', type: 'file_read', target: 'CF-01', done: false },
+      'terminals': { desc: 'Check security terminals (1,2)', type: 'terminal_list', targets: [1,2], progress: [], done: false },
+      'scan_2x_b2': { desc: 'Scan B2 corridors (2x)', type: 'scan_count', target: 2, progress: 0, done: false },
+      'coherence_50': { desc: 'Maintain coherence ≥ 50%', type: 'coherence', target: 50, done: false }
+    },
+    rewards: {
+      unlockFloor: 'B3',
+      truths: 1,
+      credits: 80,
+      completionText: '[MISSION COMPLETE] Research Division access granted. B3 unlocked.'
+    }
+  },
+  
+  'M_B3_ANCHOR': {
+    id: 'M_B3_ANCHOR',
+    title: 'Research: Anchoring Protocol',
+    floor: 'B3',
+    briefing: 'Assist Dr. Chen with consciousness anchoring research. Collect samples and study lattice specifications.',
+    objectives: {
+      'talk_sarah_1': { desc: 'Accept assignment from Dr. Chen', type: 'talk_npc', target: 'sarah', count: 1, done: false },
+      'collect_cf02': { desc: 'Receive CF-02', type: 'file_find', target: 'CF-02', done: false },
+      'read_cf02': { desc: 'Read CF-02', type: 'file_read', target: 'CF-02', done: false },
+      'scan_3x_b3': { desc: 'Collect samples (scan 3x)', type: 'scan_count', target: 3, progress: 0, done: false },
+      'terminals_lattice': { desc: 'Access lattice terminals (3,4,5)', type: 'terminal_list', targets: [3,4,5], progress: [], done: false },
+      'talk_sarah_2': { desc: 'Report to Dr. Chen again', type: 'talk_npc', target: 'sarah', count: 2, done: false },
+      'collect_cf07': { desc: 'Receive CF-07', type: 'file_find', target: 'CF-07', done: false },
+      'read_cf07': { desc: 'Read CF-07', type: 'file_read', target: 'CF-07', done: false },
+      'get_keycard_auth': { desc: 'Get Keycard authorization', type: 'special', target: 'keycard_auth', done: false },
+      'buy_keycard': { desc: 'Purchase Keycard (120¢)', type: 'purchase', target: 'keycard', done: false }
+    },
+    rewards: {
+      unlockFloor: 'B4',
+      truths: 2,
+      credits: 120,
+      completionText: '[MISSION COMPLETE] Maintenance clearance granted. B4 unlocked.'
+    }
+  },
+  
+  'M_B4_PATTERN': {
+    id: 'M_B4_PATTERN',
+    title: 'Maintenance: Pattern Sequence',
+    floor: 'B4',
+    briefing: 'Unit-4 reports anomalies. Complete pattern sequence 7→3→9 with Bio-Scanner.',
+    objectives: {
+      'talk_janitor': { desc: 'Report to Unit-4', type: 'talk_npc', target: 'janitor', count: 1, done: false },
+      'collect_cf04': { desc: 'Review CF-04', type: 'file_find', target: 'CF-04', done: false },
+      'read_cf04': { desc: 'Read CF-04', type: 'file_read', target: 'CF-04', done: false },
+      'clean_3x': { desc: 'Help cleaning (3x)', type: 'clean_count', target: 3, progress: 0, done: false },
+      'get_scanner_auth': { desc: 'Get Scanner authorization', type: 'special', target: 'scanner_auth', done: false },
+      'buy_scanner': { desc: 'Purchase Scanner (150¢)', type: 'purchase', target: 'scanner', done: false },
+      'pattern_7': { desc: 'Access terminal 7', type: 'pattern_step', target: 7, done: false },
+      'pattern_3': { desc: 'Access terminal 3', type: 'pattern_step', target: 3, done: false },
+      'pattern_9': { desc: 'Access terminal 9', type: 'pattern_step', target: 9, done: false },
+      'notes_10': { desc: 'Collect 10 notes total', type: 'notes_count', target: 10, done: false },
+      'coherence_40': { desc: 'Maintain coherence ≥ 40%', type: 'coherence', target: 40, done: false }
+    },
+    rewards: {
+      unlockFloor: 'B5',
+      truths: 1,
+      credits: 150,
+      completionText: '[MISSION COMPLETE] Depth level access granted. B5 unlocked.'
+    }
+  },
+  
+  'M_B5_REVELATION': {
+    id: 'M_B5_REVELATION',
+    title: 'Final: Revelation',
+    floor: 'B5',
+    briefing: 'Access Terminal 9 to complete integration sequence.',
+    objectives: {
+      'scanner_equipped': { desc: 'Bio-Scanner equipped', type: 'inventory_check', target: 'scanner', done: false },
+      'truths_4': { desc: 'Acquire 4 Truths', type: 'truths_count', target: 4, done: false },
+      'coherence_40_b5': { desc: 'Maintain coherence ≥ 40%', type: 'coherence', target: 40, done: false },
+      'terminal_9_final': { desc: 'Access Terminal 9', type: 'terminal_final', target: 9, done: false }
+    },
+    rewards: {
+      unlockFloor: null,
+      truths: 0,
+      credits: 0,
+      victory: true,
+      completionText: '[REVELATION] You remember what you are.'
+    }
+  }
+};
+
+// NPC Dialogue (Expanded per tier)
+var tierLines = {
+  sarah: [
+    ['You must be the research assistant. I\'m Dr. Chen - call me Sarah.', 
+     'Patterns are polite until asked the wrong way. Remember that.',
+     'I need someone who observes without imposing expectations.'],
+    ['Good work on the samples. The lattice shows interesting compliance.',
+     'Your file has two birthdays. Two people vouched for you at different times.',
+     'When you stop insisting on singularity, the lattice aligns.'],
+    ['You understand anchoring now. Here are the Memory Lattice specs - study them.',
+     'Terminal sequence 7→3→9 will show you what you\'ve been.',
+     'Here\'s requisition authorization for the Keycard. You\'ve earned it.'],
+    ['The lattice reveals, not changes. You\'re walking toward revelation.',
+     'Don\'t fear what you find deeper. Fear is just another insistence.',
+     'Unit-4 will need your help. Go to Maintenance when ready.']
+  ],
+  marcus: [
+    ['Officer Webb, Security. You\'re the one investigating the badge duplicates?',
+     'Strange things happen in west corridor. Time doesn\'t behave there.',
+     'If you see your reflection delayed by two seconds - that\'s security finding you interesting.'],
+    ['The incident report is... difficult. I saw something that turned corners wrong.',
+     'You didn\'t take the elevator here. You arrived like rumors do - fully formed.',
+     'Mirrors report slower at night. Don\'t trust them during shift change.'],
+    ['I\'ve seen your name twice on one roster. It corrected itself after I looked away.',
+     'If a door won\'t open, act like you forgot you needed it. Doors hate to be obvious.',
+     'Research wants to talk to you. Dr. Chen doesn\'t ask for people randomly.'],
+    ['You\'re different since B3. The lattice is working on you.',
+     'Pattern 7→3→9 will change how you see yourself. Be ready for that.']
+  ],
+  janitor: [
+    ['Unit-4. Maintenance. The building dreams in liquids. I mop until it forgets.',
+     'Spill log says ocean but we don\'t have oceans. Just practice at remembering.',
+     'Floors complain when nobody listens. Help me clean and they quiet down.'],
+    ['Your pipes make a fluted sound. That means you\'re new, or pretending new.',
+     'B5 drops things it can\'t carry. If you hear clatters with nothing there, pick up what you can\'t see.',
+     'The building is homesick. I understand that. Do you?'],
+    ['I remember sky. Before walls. The floor doesn\'t remember weight though.',
+     'If you help clean, corridors stop complaining. They like being acknowledged.',
+     'Pattern 7→3→9 opens B5. But you need the Scanner first. I\'ll authorize purchase.'],
+    ['You\'re ready for the depths now. B5 will recognize you.',
+     'The building sorted you from the moment you arrived.',
+     'Remember: B5 doesn\'t change you. It shows you what you were all along.']
+  ],
+  echo: [
+    ['Hello, Gerth. You arrived by deciding to be here. That makes two of you.',
+     'I am not separate from you. Name three things you cannot prove.',
+     'The lattice has been expecting you.'],
+    ['You left yourself a note. You dislike it because it\'s precise.',
+     'The building learned to dream you. When you breathe evenly, it remembers which dream.',
+     'Precision sounds like cruelty until you adopt it.'],
+    ['Do not bully truth. Invite it to align with the shape you allow.',
+     'Now breathe. Listen for your outline. Your edges will finish themselves.',
+     'You are witness and witnessed. Subject and observer. Both. Neither. Whole.']
+  ]
+};
 
 // Achievement Rules
 var achRules = [
@@ -235,78 +421,10 @@ var achRules = [
   { id: 'ACH_JANITOR', name: "Janitor's Friend", test: function () { return gameState.janitorTrust >= 30; } },
   { id: 'ACH_CHAIN', name: 'Pattern Follower', test: function () { return gameState.dataChain && gameState.dataChain.done; } },
   { id: 'ACH_ECHO', name: 'The Listener', test: function () { return gameState.echoUnlocked; } },
-  { id: 'ACH_TASK10', name: 'Taskmaster', test: function () { return gameState._completedRequests >= 10; } },
+  { id: 'ACH_MISSION_B1', name: 'B1 Complete', test: function () { return gameState.completedMissions.indexOf('M_B1_DUPLICATE') > -1; } },
+  { id: 'ACH_MISSION_B2', name: 'B2 Complete', test: function () { return gameState.completedMissions.indexOf('M_B2_CORRIDOR') > -1; } },
   { id: 'ACH_WIN', name: 'Revelation', test: function () { return gameState._won === true; } }
 ];
 
-// NPC Dialogue Tiers
-var tierLines = {
-  sarah: [
-    [
-      'Patterns are not random; they are polite until asked the wrong way.',
-      'Anchors do not enforce truth; they reward the building when it behaves.'
-    ],
-    [
-      'Your file has two birthdays because two people vouched for you at different times.',
-      'When you stop insisting on being singular, the lattice aligns.'
-    ],
-    [
-      'If you follow 7 → 3 → 9, do it without demanding results.',
-      'Take these notes. Read them like a tone to hum along with.'
-    ]
-  ],
-  marcus: [
-    [
-      'Authorization looks smudged. Keep your hands visible when you speak to doors.',
-      'If static bends inward, you look away. If it follows you, speak your name twice.'
-    ],
-    [
-      'You did not take the elevator to get here. You arrived the way rumors do.',
-      'Mirrors report slower at night. If yours is delayed, security finds you interesting.'
-    ],
-    [
-      'I have seen your name twice on a roster once. It corrected itself after I stopped reading.',
-      'If you want a door open, act like you forgot you needed it.'
-    ]
-  ],
-  janitor: [
-    [
-      'Must clean. Stains keep returning because the building dreams in liquids.',
-      'Spill log says ocean. We do not have oceans. We have practice.'
-    ],
-    [
-      'Pipes learn people. Yours makes a fluted sound. That means you are new.',
-      'B5 drops things it cannot carry. Pick up what you cannot see.'
-    ],
-    [
-      'I remember sky. Before the walls. The floor does not remember weight.',
-      'If you help me clean, the corridor stops complaining.'
-    ]
-  ],
-  echo: [
-    [
-      'Hello, Gerth. You arrived by deciding to be here. That makes two of you.',
-      'Name three things you cannot prove. I am not separate from you.'
-    ],
-    [
-      'You left yourself a note. You dislike it because it is precise.',
-      'The building learned to dream you. When you breathe evenly, it remembers.'
-    ],
-    [
-      'The lattice aligns when pressure falls away. Do not bully truth.',
-      'Now breathe, and listen for your outline. Your edges will finish themselves.'
-    ]
-  ]
-};
-
-// Request Types
-var requestKinds = [
-  'visit',
-  'scan',
-  'clean',
-  'speak',
-  'work',
-  'terminals',
-  'rest',
-  'files'
-];
+// Request Types (keeping old system for side income)
+var requestKinds = ['visit', 'scan', 'clean', 'speak', 'work', 'terminals', 'rest', 'files'];

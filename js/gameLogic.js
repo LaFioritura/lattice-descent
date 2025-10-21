@@ -1,5 +1,5 @@
 /* ===========================
-   NEXUS PROTOCOL - Game Logic (INVESTIGATIVE SYSTEM)
+   NEXUS PROTOCOL - Game Logic (MISSION SYSTEM v2)
    =========================== */
 
 function grantAchievement(id) {
@@ -51,239 +51,212 @@ function doLook() {
   }
 }
 
-// ===== INVESTIGATIVE UNLOCK SYSTEM =====
-function canUnlockFloor(floor) {
-  if (floor === 'B2') {
-    // B2: 3 requests + coherence ≥ 60% + 1 file letto + 2 note
-    var hasFile = gameState.files.some(function (f) { 
-      return (f.id === 'CF-03' || f.id === 'CF-06') && f._read; 
-    });
-    return gameState._completedRequests >= 3 && 
-           gameState.coherence >= 60 && 
-           hasFile &&
-           gameState.notes.length >= 2;
-  }
+// ===== MISSION SYSTEM =====
+
+function getCurrentMission() {
+  if (!gameState.activeMission) return null;
+  return missions[gameState.activeMission];
+}
+
+function updateMissionObjective(objId, value) {
+  var mission = getCurrentMission();
+  if (!mission) return;
   
-  if (floor === 'B3') {
-    // B3: 5 requests + Marcus parlato + CF-01 letto + 4 note + coherence ≥ 50%
-    var hasCF01 = gameState.files.some(function (f) { return f.id === 'CF-01' && f._read; });
-    return gameState.floorsUnlocked.B2 && 
-           gameState._completedRequests >= 5 && 
-           gameState.met.marcus > 0 &&
-           hasCF01 &&
-           gameState.notes.length >= 4 &&
-           gameState.coherence >= 50;
-  }
+  var obj = mission.objectives[objId];
+  if (!obj || obj.done) return;
   
-  if (floor === 'B4') {
-    // B4: 8 requests + Sarah parlato + CF-02 e CF-07 letti + Keycard + 7 note + 2 Truths
-    var hasCF02 = gameState.files.some(function (f) { return f.id === 'CF-02' && f._read; });
-    var hasCF07 = gameState.files.some(function (f) { return f.id === 'CF-07' && f._read; });
-    var hasKeycard = gameState.inventory.some(function (i) { return i.id === 'keycard'; });
-    return gameState.floorsUnlocked.B3 && 
-           gameState._completedRequests >= 8 && 
-           gameState.met.sarah > 0 &&
-           hasCF02 && hasCF07 &&
-           hasKeycard &&
-           gameState.notes.length >= 7 &&
-           gameState.truths >= 2;
-  }
+  var wasComplete = isMissionComplete(mission);
   
-  if (floor === 'B5') {
-    // B5: 12 requests + Janitor parlato + Pattern + Scanner + CF-04 letto + 10 note + 3 Truths + coherence ≥ 40%
-    var hasKeycard = gameState.inventory.some(function (i) { return i.id === 'keycard'; });
-    var hasScanner = gameState.inventory.some(function (i) { return i.id === 'scanner'; });
-    var patternDone = gameState.dataChain && gameState.dataChain.done;
-    var hasCF04 = gameState.files.some(function (f) { return f.id === 'CF-04' && f._read; });
-    return gameState.floorsUnlocked.B4 && 
-           gameState._completedRequests >= 12 &&
-           gameState.met.janitor > 0 &&
-           hasKeycard && hasScanner &&
-           patternDone &&
-           hasCF04 &&
-           gameState.notes.length >= 10 &&
-           gameState.truths >= 3 &&
-           gameState.coherence >= 40;
-  }
-  
-  return false;
-}
-
-function tryUnlockB2() {
-  if (!gameState.floorsUnlocked.B2 && canUnlockFloor('B2')) {
-    gameState.floorsUnlocked.B2 = true;
-    think('The elevator remembers the way to B2.');
-    toast('Access expanded', 'B2 Security unlocked.', 'info');
-    addLine('[INVESTIGATION COMPLETE] Security clearance granted.', 'success-message');
-    hint('Security level unlocked. Marcus Webb awaits. Use: move b2');
-  }
-}
-
-function tryUnlockB3() {
-  if (!gameState.floorsUnlocked.B3 && canUnlockFloor('B3')) {
-    gameState.floorsUnlocked.B3 = true;
-    think('Research starts taking my calls.');
-    toast('Access expanded', 'B3 Research unlocked.', 'info');
-    addLine('[INVESTIGATION COMPLETE] Research clearance granted.', 'success-message');
-    hint('Research level unlocked. Dr. Sarah Chen is there. Use: move b3');
-  }
-}
-
-function tryUnlockB4() {
-  if (!gameState.floorsUnlocked.B4 && canUnlockFloor('B4')) {
-    gameState.floorsUnlocked.B4 = true;
-    think('Maintenance signs my permission with a wet glove.');
-    toast('Access expanded', 'B4 Maintenance unlocked.', 'info');
-    addLine('[INVESTIGATION COMPLETE] Maintenance clearance granted.', 'success-message');
-    hint('Maintenance level unlocked. Custodian Unit 4 maintains the depths. Use: move b4');
-  }
-}
-
-function tryUnlockB5() {
-  if (!gameState.floorsUnlocked.B5 && canUnlockFloor('B5')) {
-    gameState.floorsUnlocked.B5 = true;
-    think('The bottom floor exhales.');
-    toast('Access expanded', 'B5 Depths unlocked.', 'warn');
-    addLine('[INVESTIGATION COMPLETE] Maximum clearance granted.', 'success-message');
-    hint('WARNING: B5 drains coherence rapidly. Ensure you are prepared.');
-  }
-}
-
-function pickDistinct(arr, n) {
-  var pool = arr.slice(), out = [];
-  while (pool.length && out.length < n) {
-    out.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
-  }
-  return out;
-}
-
-// ===== REQUEST SYSTEM =====
-function makeRequest() {
-  var k = requestKinds[Math.floor(Math.random() * requestKinds.length)];
-  var id = Math.random().toString(36).slice(2, 7);
-  var meta = {}, goal = 1, progress = 0, reward = 40, desc = '';
-
-  if (k === 'visit') {
-    var places_to_visit = pickDistinct(places, 2);
-    meta.places = places_to_visit;
-    meta.donePlaces = {};
-    goal = places_to_visit.length;
-    reward = 60;
-    desc = 'Visit: ' + places_to_visit.join(', ');
-  } else if (k === 'speak') {
-    var npcs_to_talk = pickDistinct(['guard', 'researcher', 'custodian'], 2);
-    meta.who = npcs_to_talk;
-    meta.done = {};
-    goal = npcs_to_talk.length;
-    reward = 70;
-    desc = 'Speak with: ' + npcs_to_talk.join(' & ');
-  } else if (k === 'terminals') {
-    var terms = pickDistinct([1, 2, 3, 4, 5, 6], 3);
-    meta.terminals = terms;
-    meta.done = {};
-    goal = terms.length;
-    reward = 80;
-    desc = 'Access terminals: ' + terms.join(', ');
-  } else if (k === 'scan') {
-    goal = 2;
-    reward = 50;
-    desc = 'Scan vents (2x)';
-  } else if (k === 'work') {
-    goal = 3;
-    reward = 60;
-    desc = 'Complete work shifts (3x)';
-  } else if (k === 'clean') {
-    goal = 2;
-    reward = 55;
-    desc = 'Help maintenance (2 corridors)';
-  } else if (k === 'rest') {
-    meta.targetCoherence = 85;
-    reward = 40;
-    desc = 'Restore coherence above 85%';
-  } else if (k === 'files') {
-    goal = 2;
-    reward = 70;
-    desc = 'Read 2 files';
-  }
-
-  return { id: id, kind: k, desc: desc, goal: goal, progress: progress, reward: reward, meta: meta };
-}
-
-function fillRequests() {
-  gameState.requests = [];
-  for (var i = 0; i < 3; i++) gameState.requests.push(makeRequest());
-}
-
-function listRequests() {
-  if (gameState.requests.length === 0) fillRequests();
-  addLine('=== ACTIVE REQUESTS ===', 'system-message');
-  gameState.requests.forEach(function (r, i) {
-    var status = r.progress >= r.goal ? '[DONE]' : '[' + r.progress + '/' + r.goal + ']';
-    addLine((i + 1) + '. ' + r.desc + ' ' + status + ' — ' + r.reward + '¢');
-  });
-  addLine('Use "accept [n]" to focus. "refresh" (-20¢) for new requests.');
-}
-
-function finishRequest(r) {
-  addLine('[COMPLETED] ' + r.desc + ' [+' + r.reward + '¢]', 'success-message');
-  gameState.credits += r.reward;
-  playSound('success');
-  gameState._completedRequests++;
-  createParticles(15, $('#credits').parentElement);
-
-  // Check unlocks after every request completion
-  tryUnlockB2();
-  tryUnlockB3();
-  tryUnlockB4();
-  tryUnlockB5();
-
-  // Deterministic note reward: every 2 completed requests
-  if (gameState._completedRequests % 2 === 0) {
-    var pool = Object.keys(noteBank).filter(function (id) { return gameState.notes.indexOf(id) === -1; });
-    if (pool.length) {
-      grantNote(pool[0]);
+  // Update based on type
+  if (obj.type === 'work_count' || obj.type === 'scan_count' || obj.type === 'clean_count') {
+    obj.progress = (obj.progress || 0) + 1;
+    if (obj.progress >= obj.target) {
+      obj.done = true;
+      addLine('[OBJECTIVE] ' + obj.desc + ' ✓', 'success-message');
+    } else {
+      addLine('[OBJECTIVE] ' + obj.desc + ' (' + obj.progress + '/' + obj.target + ')', 'system-message');
     }
+  } else if (obj.type === 'terminal_list') {
+    if (obj.progress.indexOf(value) === -1) {
+      obj.progress.push(value);
+      addLine('[OBJECTIVE] Terminal ' + value + ' accessed (' + obj.progress.length + '/' + obj.targets.length + ')', 'system-message');
+      if (obj.progress.length >= obj.targets.length) {
+        obj.done = true;
+        addLine('[OBJECTIVE] ' + obj.desc + ' ✓', 'success-message');
+      }
+    }
+  } else if (obj.type === 'talk_npc') {
+    if (obj.count && gameState.met[obj.target] >= obj.count) {
+      obj.done = true;
+      addLine('[OBJECTIVE] ' + obj.desc + ' ✓', 'success-message');
+    }
+  } else if (obj.type === 'file_find') {
+    if (gameState.files.some(function(f) { return f.id === obj.target; })) {
+      obj.done = true;
+      addLine('[OBJECTIVE] ' + obj.desc + ' ✓', 'success-message');
+    }
+  } else if (obj.type === 'file_read') {
+    if (gameState.files.some(function(f) { return f.id === obj.target && f._read; })) {
+      obj.done = true;
+      addLine('[OBJECTIVE] ' + obj.desc + ' ✓', 'success-message');
+    }
+  } else if (obj.type === 'coherence') {
+    if (gameState.coherence >= obj.target) {
+      obj.done = true;
+    }
+  } else if (obj.type === 'notes_count') {
+    if (gameState.notes.length >= obj.target) {
+      obj.done = true;
+      addLine('[OBJECTIVE] ' + obj.desc + ' ✓', 'success-message');
+    }
+  } else if (obj.type === 'truths_count') {
+    if (gameState.truths >= obj.target) {
+      obj.done = true;
+    }
+  } else if (obj.type === 'inventory_check') {
+    if (gameState.inventory.some(function(i) { return i.id === obj.target; })) {
+      obj.done = true;
+    }
+  } else if (obj.type === 'purchase') {
+    if (gameState.inventory.some(function(i) { return i.id === obj.target; })) {
+      obj.done = true;
+      addLine('[OBJECTIVE] ' + obj.desc + ' ✓', 'success-message');
+    }
+  } else if (obj.type === 'special') {
+    // Handled by specific triggers
+    if (value === obj.target) {
+      obj.done = true;
+      addLine('[OBJECTIVE] ' + obj.desc + ' ✓', 'success-message');
+    }
+  } else if (obj.type === 'pattern_step') {
+    if (gameState.dataChain && gameState._terminalPattern.indexOf(obj.target) > -1) {
+      obj.done = true;
+      addLine('[OBJECTIVE] ' + obj.desc + ' ✓', 'success-message');
+    }
+  } else if (obj.type === 'terminal_final') {
+    // Victory condition
+    obj.done = true;
+  } else {
+    // Generic completion
+    obj.done = true;
+    addLine('[OBJECTIVE] ' + obj.desc + ' ✓', 'success-message');
   }
-
+  
+  // Check if mission just completed
+  if (!wasComplete && isMissionComplete(mission)) {
+    completeMission(mission);
+  }
+  
   updateDisplay();
 }
 
-function completeRequestIf(kind, payload) {
-  gameState.requests.forEach(function (r) {
-    if (r.progress >= r.goal || r.kind !== kind) return;
-
-    if (kind === 'visit' && r.meta.places && r.meta.places.indexOf(payload) > -1 && !r.meta.donePlaces[payload]) {
-      r.meta.donePlaces[payload] = true;
-      r.progress++;
-      addLine('[Request: ' + r.progress + '/' + r.goal + ']', 'success-message');
-    } else if (kind === 'speak' && r.meta.who) {
-      for (var i = 0; i < r.meta.who.length; i++) {
-        if (payload.indexOf(r.meta.who[i]) > -1 && !r.meta.done[r.meta.who[i]]) {
-          r.meta.done[r.meta.who[i]] = true;
-          r.progress++;
-          addLine('[Request: ' + r.progress + '/' + r.goal + ']', 'success-message');
-          break;
-        }
-      }
-    } else if (kind === 'terminals' && r.meta.terminals && r.meta.terminals.indexOf(Number(payload)) > -1 && !r.meta.done[payload]) {
-      r.meta.done[payload] = true;
-      r.progress++;
-      addLine('[Request: ' + r.progress + '/' + r.goal + ']', 'success-message');
-    } else if ((kind === 'scan' || kind === 'clean' || kind === 'work') && !payload) {
-      r.progress++;
-      addLine('[Request: ' + r.progress + '/' + r.goal + ']', 'success-message');
-    } else if (kind === 'rest' && r.meta.targetCoherence && gameState.coherence >= r.meta.targetCoherence) {
-      r.progress = r.goal;
-    } else if (kind === 'files' && payload === 'read') {
-      r.progress++;
-      addLine('[Request: ' + r.progress + '/' + r.goal + ']', 'success-message');
+function isMissionComplete(mission) {
+  if (!mission) return false;
+  var allDone = true;
+  for (var key in mission.objectives) {
+    if (!mission.objectives[key].done) {
+      allDone = false;
+      break;
     }
+  }
+  return allDone;
+}
 
-    if (r.progress >= r.goal) finishRequest(r);
-  });
+function completeMission(mission) {
+  if (!mission) return;
+  
+  addLine('', '');
+  addLine('═══════════════════════════════', 'system-message');
+  addLine('   MISSION COMPLETE', 'success-message');
+  addLine('   ' + mission.title, 'success-message');
+  addLine('═══════════════════════════════', 'system-message');
+  addLine(mission.rewards.completionText, 'success-message');
+  addLine('', '');
+  
+  // Grant rewards
+  if (mission.rewards.truths) {
+    gameState.truths += mission.rewards.truths;
+    addLine('[+' + mission.rewards.truths + ' Truth]', 'success-message');
+    createParticles(15, $('#coherence').parentElement);
+  }
+  
+  if (mission.rewards.credits) {
+    gameState.credits += mission.rewards.credits;
+    addLine('[+' + mission.rewards.credits + '¢ Bonus]', 'success-message');
+  }
+  
+  // Unlock floor
+  if (mission.rewards.unlockFloor) {
+    gameState.floorsUnlocked[mission.rewards.unlockFloor] = true;
+    toast('Floor Unlocked', mission.rewards.unlockFloor + ' is now accessible', 'good');
+    hint('Use: move ' + mission.rewards.unlockFloor.toLowerCase());
+  }
+  
+  // Victory
+  if (mission.rewards.victory) {
+    setTimeout(function() {
+      triggerWin();
+    }, 2000);
+    return;
+  }
+  
+  // Mark complete
+  gameState.completedMissions.push(mission.id);
+  
+  // Activate next mission
+  var nextMissions = {
+    'M_B1_DUPLICATE': 'M_B2_CORRIDOR',
+    'M_B2_CORRIDOR': 'M_B3_ANCHOR',
+    'M_B3_ANCHOR': 'M_B4_PATTERN',
+    'M_B4_PATTERN': 'M_B5_REVELATION'
+  };
+  
+  if (nextMissions[mission.id]) {
+    gameState.activeMission = nextMissions[mission.id];
+    var nextMission = missions[nextMissions[mission.id]];
+    addLine('', '');
+    addLine('[NEW MISSION] ' + nextMission.title, 'system-message');
+    addLine(nextMission.briefing, 'system-message');
+    hint('Use "mission" to see objectives');
+  }
+  
+  playSound('success');
+  createParticles(30, document.body);
+  checkAchievements();
+  updateDisplay();
+}
+
+// ===== MISSION TRACKING HELPERS =====
+
+function checkAllMissionProgress() {
+  var mission = getCurrentMission();
+  if (!mission) return;
+  
+  // Check all objectives that can auto-complete
+  for (var key in mission.objectives) {
+    var obj = mission.objectives[key];
+    if (obj.done) continue;
+    
+    if (obj.type === 'coherence' && gameState.coherence >= obj.target) {
+      obj.done = true;
+    } else if (obj.type === 'notes_count' && gameState.notes.length >= obj.target) {
+      updateMissionObjective(key);
+    } else if (obj.type === 'truths_count' && gameState.truths >= obj.target) {
+      obj.done = true;
+    } else if (obj.type === 'inventory_check') {
+      if (gameState.inventory.some(function(i) { return i.id === obj.target; })) {
+        obj.done = true;
+      }
+    }
+  }
+  
+  if (isMissionComplete(mission)) {
+    completeMission(mission);
+  }
 }
 
 // ===== NOTE/FILE SYSTEM =====
+
 function grantNote(id) {
   if (gameState.notes.indexOf(id) === -1) {
     gameState.notes.push(id);
@@ -291,11 +264,16 @@ function grantNote(id) {
     toast('New Note', noteBank[id], 'good');
     playSound('notification');
     
-    // Check unlocks after note collection
-    tryUnlockB2();
-    tryUnlockB3();
-    tryUnlockB4();
-    tryUnlockB5();
+    // Check mission progress
+    var mission = getCurrentMission();
+    if (mission) {
+      for (var key in mission.objectives) {
+        if (mission.objectives[key].type === 'notes_count') {
+          updateMissionObjective(key);
+          break;
+        }
+      }
+    }
     
     updateDisplay();
   }
@@ -307,7 +285,20 @@ function grantFile(obj) {
     addLine('[FILE] ' + obj.id + ' — ' + obj.title, 'success-message');
     toast('New File', obj.title, 'info');
     playSound('notification');
-    hint('Use "read ' + obj.id + '" to investigate this file.');
+    hint('Use "read ' + obj.id + '" to analyze this file');
+    
+    // Check mission progress
+    var mission = getCurrentMission();
+    if (mission) {
+      for (var key in mission.objectives) {
+        var objDef = mission.objectives[key];
+        if (objDef.type === 'file_find' && objDef.target === obj.id) {
+          updateMissionObjective(key);
+          break;
+        }
+      }
+    }
+    
     updateDisplay();
   }
 }
@@ -322,7 +313,7 @@ function listFiles() {
     var readStatus = f._read ? ' [READ]' : ' [UNREAD]';
     addLine(f.id + ' — ' + f.title + readStatus);
   });
-  addLine('Use: read [id] to investigate files');
+  addLine('Use: read [id] to analyze files');
 }
 
 function readFile(arg) {
@@ -340,13 +331,23 @@ function readFile(arg) {
   addLine('=== ' + f.id + ' — ' + f.title + ' ===', 'system-message');
   f.body.forEach(function (p) { addLine(p); });
 
-  // Mark as read
   if (!f._read) {
     f._read = true;
-    addLine('[File analyzed and catalogued]', 'success-message');
+    addLine('[File analyzed and marked as read]', 'success-message');
+    
+    // Check mission progress
+    var mission = getCurrentMission();
+    if (mission) {
+      for (var key in mission.objectives) {
+        var obj = mission.objectives[key];
+        if (obj.type === 'file_read' && obj.target === f.id) {
+          updateMissionObjective(key);
+          break;
+        }
+      }
+    }
   }
 
-  // Grant truth from specific files
   if (f.grantsTruth && !f._truthGranted) {
     gameState.truths++;
     think('The pieces agree for a breath.');
@@ -355,18 +356,12 @@ function readFile(arg) {
     addLine('[+1 Truth]', 'success-message');
   }
 
-  completeRequestIf('files', 'read');
-  
-  // Check unlocks after reading file
-  tryUnlockB2();
-  tryUnlockB3();
-  tryUnlockB4();
-  tryUnlockB5();
-  
+  checkAllMissionProgress();
   updateDisplay();
 }
 
 // ===== SCAN SYSTEM =====
+
 function scanEvent() {
   addLine('[I steady my breath and listen...]', 'system-message');
   playSound('glitch');
@@ -376,7 +371,6 @@ function scanEvent() {
   gameState.coherence = Math.max(0, gameState.coherence - loss);
   addLine('[-' + loss + ' Coherence]', 'error-message');
 
-  // Deterministic note drops based on floor
   var floorNotes = {
     'B1': ['N1', 'N3', 'N6'],
     'B2': ['N2', 'N4', 'N16'],
@@ -395,16 +389,28 @@ function scanEvent() {
     addLine('[The vents have nothing new to say here.]', 'thought');
   }
 
-  completeRequestIf('scan');
+  // Update mission scan objectives
+  var mission = getCurrentMission();
+  if (mission) {
+    for (var key in mission.objectives) {
+      var obj = mission.objectives[key];
+      if (obj.type === 'scan_count' && !obj.done) {
+        updateMissionObjective(key, 1);
+        break;
+      }
+    }
+  }
+
   updateDisplay();
 }
 
 // ===== TERMINAL PATTERN SYSTEM =====
+
 function initDataChain() {
   if (gameState.dataChain) return;
   gameState.dataChain = { steps: [7, 3, 9], index: 0, done: false };
-  think('A pattern emerges from the terminal logs: 7 → 3 → 9.');
-  hint('Access terminals in this specific sequence to complete the pattern.');
+  think('A pattern emerges: 7 → 3 → 9.');
+  hint('Access terminals in this specific sequence.');
 }
 
 function processTerminalAccess(tnum) {
@@ -422,15 +428,21 @@ function processTerminalAccess(tnum) {
       gameState._terminalPattern.push(num);
       think('Pattern progress: ' + gameState._terminalPattern.join(' → '));
 
+      // Update mission
+      var mission = getCurrentMission();
+      if (mission && mission.id === 'M_B4_PATTERN') {
+        if (num === 7) updateMissionObjective('pattern_7');
+        if (num === 3) updateMissionObjective('pattern_3');
+        if (num === 9) updateMissionObjective('pattern_9');
+      }
+
       if (gameState.dataChain.index >= gameState.dataChain.steps.length) {
         gameState.dataChain.done = true;
         gameState.truths++;
         addLine('[PATTERN COMPLETE] Something in me stops resisting.', 'success-message');
         addLine('[+1 Truth]', 'success-message');
-        toast('Data Chain Complete', 'Pattern 7→3→9 recognized', 'good');
+        toast('Pattern Complete', 'Sequence 7→3→9 recognized', 'good');
         createParticles(20, document.body);
-        
-        tryUnlockB5();
       }
     } else if (num === 7 || num === 3 || num === 9) {
       addLine('[Pattern broken. Restart from terminal 7.]', 'error-message');
@@ -438,9 +450,24 @@ function processTerminalAccess(tnum) {
       gameState._terminalPattern = [];
     }
   }
+  
+  // Update mission terminal objectives
+  var mission = getCurrentMission();
+  if (mission) {
+    for (var key in mission.objectives) {
+      var obj = mission.objectives[key];
+      if (obj.type === 'terminal_list' && !obj.done) {
+        if (obj.targets.indexOf(num) > -1) {
+          updateMissionObjective(key, num);
+        }
+        break;
+      }
+    }
+  }
 }
 
 // ===== ECHO UNLOCK =====
+
 function maybeUnlockEcho() {
   if (gameState.echoUnlocked) return;
   
@@ -449,13 +476,14 @@ function maybeUnlockEcho() {
   
   if (gameState.floorsUnlocked.B5 && spokeToAll && gameState.truths >= 4 && hasPattern) {
     gameState.echoUnlocked = true;
-    think('The hush on B5 starts answering the outline of my breath.');
-    toast('A presence stirs', 'Echo listens on B5.', 'warn');
-    hint('Echo can now be contacted on B5 using: talk voice');
+    think('The hush on B5 starts answering.');
+    toast('A presence stirs', 'Echo listens on B5', 'warn');
+    hint('Echo can be contacted on B5: talk voice');
   }
 }
 
 // ===== LOSE/WIN CONDITIONS =====
+
 function checkLose() {
   if (gameState.coherence <= 0) {
     gameState.coherence = 0;
@@ -474,11 +502,11 @@ function triggerGameOver(reason) {
 
   var html = '<p class="error-message"><strong>' + reason + '</strong></p>' +
     '<p>Time survived: <strong>' + mins + ':' + secs + '</strong></p>' +
-    '<p>Credits earned: <strong>' + gameState.credits + '¢</strong></p>' +
-    '<p>Truths gathered: <strong>' + gameState.truths + '</strong></p>' +
-    '<p>Notes found: <strong>' + gameState.notes.length + '/16</strong></p>' +
-    '<p>Files collected: <strong>' + gameState.files.length + '/' + fileBank.length + '</strong></p>' +
-    '<p>Requests completed: <strong>' + gameState._completedRequests + '</strong></p>' +
+    '<p>Credits: <strong>' + gameState.credits + '¢</strong></p>' +
+    '<p>Truths: <strong>' + gameState.truths + '</strong></p>' +
+    '<p>Notes: <strong>' + gameState.notes.length + '/16</strong></p>' +
+    '<p>Files: <strong>' + gameState.files.length + '/' + fileBank.length + '</strong></p>' +
+    '<p>Missions: <strong>' + gameState.completedMissions.length + '/5</strong></p>' +
     '<div style="margin-top:10px"><button class="action-btn" id="restartBtn">RESTART</button></div>';
 
   $('#gameOverContent').innerHTML = html;
@@ -503,10 +531,10 @@ function triggerWin() {
   var html = '<p class="success-message"><strong>YOU REMEMBER YOUR NAME</strong></p>' +
     '<p>Time to revelation: <strong>' + mins + ':' + secs + '</strong></p>' +
     '<p>Final Coherence: <strong>' + gameState.coherence + '%</strong></p>' +
-    '<p>Truths gathered: <strong>' + gameState.truths + '</strong></p>' +
-    '<p>Notes found: <strong>' + gameState.notes.length + '/16</strong></p>' +
-    '<p>Files collected: <strong>' + gameState.files.length + '/' + fileBank.length + '</strong></p>' +
-    '<p>Requests completed: <strong>' + gameState._completedRequests + '</strong></p>' +
+    '<p>Truths: <strong>' + gameState.truths + '</strong></p>' +
+    '<p>Notes: <strong>' + gameState.notes.length + '/16</strong></p>' +
+    '<p>Files: <strong>' + gameState.files.length + '/' + fileBank.length + '</strong></p>' +
+    '<p>Missions: <strong>' + gameState.completedMissions.length + '/5</strong></p>' +
     '<p>Achievements: <strong>' + gameState.achCount + '</strong></p>' +
     '<div style="margin-top:10px"><button class="action-btn" id="restartBtn2">RESTART</button></div>';
 
@@ -515,13 +543,14 @@ function triggerWin() {
   $('#restartBtn2').onclick = function () { location.reload(); };
 
   addLine('=== REVELATION COMPLETE ===', 'system-message');
-  toast('Achievement unlocked', 'Revelation', 'good');
+  toast('Achievement', 'Revelation', 'good');
   grantAchievement('ACH_WIN');
   playSound('success');
   createParticles(30, document.body);
 }
 
 // ===== ITEM USAGE =====
+
 function useItem(name) {
   var item = gameState.inventory.find(function (i) {
     return i.name.toLowerCase().indexOf(name.toLowerCase()) > -1;
@@ -537,16 +566,7 @@ function useItem(name) {
     playSound('success');
     createParticles(15, $('#coherence').parentElement);
     gameState.inventory = gameState.inventory.filter(function (i) { return i !== item; });
-    
-    gameState.requests.forEach(function (r) {
-      if (r.kind === 'rest' && r.meta.targetCoherence && gameState.coherence >= r.meta.targetCoherence) {
-        completeRequestIf('rest', 'restore');
-      }
-    });
-    
-    tryUnlockB2();
-    tryUnlockB3();
-    tryUnlockB5();
+    checkAllMissionProgress();
     
   } else if (item.id === 'keycard') {
     if (gameState._keycardUsed) {
@@ -558,12 +578,9 @@ function useItem(name) {
     createParticles(10, $('#floor').parentElement);
     toast('Keycard activated', 'Access permissions updated', 'info');
     
-    tryUnlockB4();
-    tryUnlockB5();
-    
   } else if (item.id === 'scanner') {
     if (gameState._scannerUsed) {
-      addLine('[Scanner cooldown active. Wait before using again.]', 'thought');
+      addLine('[Scanner cooldown active.]', 'thought');
       return;
     }
     gameState._scannerUsed = true;
@@ -584,15 +601,11 @@ function useItem(name) {
       
       setTimeout(function () {
         gameState._scannerUsed = false;
-        think('Scanner recharged.');
       }, 3000);
-      
-      tryUnlockB5();
     }, 900);
     
   } else if (item.id === 'backup') {
     addLine('[I save a version of me I will never meet.]', 'system-message');
-    addLine('(This place files everyone.)', 'thought');
     toast('Memory Backup', 'Consciousness snapshot saved', 'warn');
     createParticles(20, document.body);
   }
@@ -601,6 +614,7 @@ function useItem(name) {
 }
 
 // ===== NPC DIALOGUE =====
+
 function talkTo(npcId) {
   var npc = npcsData[npcId];
   if (!npc) return;
@@ -618,27 +632,143 @@ function talkTo(npcId) {
   addLine('[' + npc.name + ']:', 'npc-message');
   addLine(line, 'npc-message');
 
-  if (gameState.met[npcId] === 0) {
+  // First talk grants Truth
+  if (gameState.met[npcId] === 0 && npcId !== 'echo') {
     gameState.truths++;
-    addLine('[+1 Truth] Their words find a place to sit in me.', 'success-message');
+    addLine('[+1 Truth] Their words find a place in me.', 'success-message');
     createParticles(10, $('#coherence').parentElement);
-    
-    var floorFiles = fileBank.filter(function (f) {
-      return f.floor === npc.location && !gameState.files.find(function (x) { return x.id === f.id; });
-    });
-    if (floorFiles.length > 0) {
-      grantFile(floorFiles[0]);
-    }
   }
 
   gameState.met[npcId]++;
 
-  completeRequestIf('speak', npc.role[0]);
+  // Grant files from NPCs
+  if (npcId === 'marcus' && gameState.met.marcus === 1) {
+    var cf01 = fileBank.find(function(f) { return f.id === 'CF-01'; });
+    if (cf01) grantFile(cf01);
+  }
+  
+  if (npcId === 'sarah' && gameState.met.sarah === 1) {
+    var cf02 = fileBank.find(function(f) { return f.id === 'CF-02'; });
+    if (cf02) grantFile(cf02);
+  }
+  
+  if (npcId === 'sarah' && gameState.met.sarah === 2) {
+    var cf07 = fileBank.find(function(f) { return f.id === 'CF-07'; });
+    if (cf07) grantFile(cf07);
+    // Grant keycard authorization
+    gameState._keycardAuthorized = true;
+    updateMissionObjective('get_keycard_auth', 'keycard_auth');
+    hint('You can now purchase the Keycard from REQUISITION');
+  }
+  
+  if (npcId === 'janitor' && gameState.met.janitor === 1) {
+    var cf04 = fileBank.find(function(f) { return f.id === 'CF-04'; });
+    if (cf04) grantFile(cf04);
+  }
+  
+  if (npcId === 'janitor' && gameState.met.janitor === 2) {
+    // Grant scanner authorization
+    gameState._scannerAuthorized = true;
+    addLine('[Unit-4]: "You can purchase the Bio-Scanner now."', 'npc-message');
+    updateMissionObjective('get_scanner_auth', 'scanner_auth');
+    hint('Scanner purchase authorized. Check REQUISITION.');
+  }
 
-  tryUnlockB3();
-  tryUnlockB4();
-  tryUnlockB5();
+  // Update mission talk objectives
+  var mission = getCurrentMission();
+  if (mission) {
+    for (var key in mission.objectives) {
+      var obj = mission.objectives[key];
+      if (obj.type === 'talk_npc' && obj.target === npcId) {
+        updateMissionObjective(key);
+        break;
+      }
+    }
+  }
+
   maybeUnlockEcho();
-
+  checkAllMissionProgress();
   updateDisplay();
+}
+
+// ===== OLD REQUEST SYSTEM (for side income) =====
+
+function pickDistinct(arr, n) {
+  var pool = arr.slice(), out = [];
+  while (pool.length && out.length < n) {
+    out.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  }
+  return out;
+}
+
+function makeRequest() {
+  var k = requestKinds[Math.floor(Math.random() * requestKinds.length)];
+  var id = Math.random().toString(36).slice(2, 7);
+  var meta = {}, goal = 1, progress = 0, reward = 40, desc = '';
+
+  if (k === 'visit') {
+    var places_to_visit = pickDistinct(places, 2);
+    meta.places = places_to_visit;
+    meta.donePlaces = {};
+    goal = places_to_visit.length;
+    reward = 50;
+    desc = 'Visit: ' + places_to_visit.join(', ');
+  } else if (k === 'work') {
+    goal = 2;
+    reward = 45;
+    desc = 'Complete work (2x)';
+  } else if (k === 'scan') {
+    goal = 2;
+    reward = 40;
+    desc = 'Scan vents (2x)';
+  } else if (k === 'rest') {
+    meta.targetCoherence = 80;
+    reward = 35;
+    desc = 'Restore coherence to 80%';
+  }
+
+  return { id: id, kind: k, desc: desc, goal: goal, progress: progress, reward: reward, meta: meta };
+}
+
+function fillRequests() {
+  gameState.requests = [];
+  for (var i = 0; i < 3; i++) gameState.requests.push(makeRequest());
+}
+
+function listRequests() {
+  if (gameState.requests.length === 0) fillRequests();
+  addLine('=== SIDE REQUESTS (Optional Income) ===', 'system-message');
+  gameState.requests.forEach(function (r, i) {
+    var status = r.progress >= r.goal ? '[DONE]' : '[' + r.progress + '/' + r.goal + ']';
+    addLine((i + 1) + '. ' + r.desc + ' ' + status + ' — ' + r.reward + '¢');
+  });
+  addLine('Use "refresh" (-20¢) for new requests. Focus on MISSION objectives first!');
+}
+
+function finishRequest(r) {
+  addLine('[SIDE REQUEST COMPLETE] ' + r.desc + ' [+' + r.reward + '¢]', 'success-message');
+  gameState.credits += r.reward;
+  playSound('success');
+  gameState._completedRequests++;
+  createParticles(10, $('#credits').parentElement);
+  updateDisplay();
+}
+
+function completeRequestIf(kind, payload) {
+  gameState.requests.forEach(function (r) {
+    if (r.progress >= r.goal || r.kind !== kind) return;
+
+    if (kind === 'visit' && r.meta.places && r.meta.places.indexOf(payload) > -1 && !r.meta.donePlaces[payload]) {
+      r.meta.donePlaces[payload] = true;
+      r.progress++;
+      addLine('[Side request: ' + r.progress + '/' + r.goal + ']', 'system-message');
+    } else if ((kind === 'work' || kind === 'scan') && !payload) {
+      r.progress++;
+      addLine('[Side request: ' + r.progress + '/' + r.goal + ']', 'system-message');
+    } else if (kind === 'rest' && r.meta.targetCoherence && gameState.coherence >= r.meta.targetCoherence) {
+      r.progress = r.goal;
+    }
+
+    if (r.progress >= r.goal) finishRequest(r);
+  });
 }

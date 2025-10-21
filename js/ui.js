@@ -183,24 +183,21 @@ function updateHUD() {
   map += gameState.place ? '\n[' + gameState.place + ']' : '';
   $('#minimap').textContent = map;
   
-  // Updated legend with clear progression info
-  var nextGoal = '';
-  if (!gameState.floorsUnlocked.B2) {
-    nextGoal = 'Next: Complete ' + (3 - gameState._completedRequests) + ' requests + gain 1 Truth';
-  } else if (!gameState.floorsUnlocked.B3) {
-    nextGoal = 'Next: Talk to Marcus + ' + (5 - gameState._completedRequests) + ' more requests + ' + (2 - gameState.truths) + ' Truths';
-  } else if (!gameState.floorsUnlocked.B4) {
-    var hasKey = gameState.inventory.some(function (i) { return i.id === 'keycard'; });
-    nextGoal = 'Next: ' + (hasKey ? '✓' : 'Buy') + ' Keycard + Talk to Sarah + ' + (3 - gameState.truths) + ' Truths';
-  } else if (!gameState.floorsUnlocked.B5) {
-    var hasScanner = gameState.inventory.some(function (i) { return i.id === 'scanner'; });
-    var patternDone = gameState.dataChain && gameState.dataChain.done;
-    nextGoal = 'Next: ' + (hasScanner ? '✓' : 'Buy') + ' Scanner + ' + (patternDone ? '✓' : 'Complete') + ' Pattern + Talk to Janitor + ' + (4 - gameState.truths) + ' Truths';
-  } else {
-    nextGoal = 'Final: Access terminal 9 on B5 with Scanner + 3 Truths';
+  // Show current mission in HUD
+  var mission = getCurrentMission();
+  var missionText = 'No active mission';
+  if (mission) {
+    var completedCount = 0;
+    var totalCount = 0;
+    for (var key in mission.objectives) {
+      totalCount++;
+      if (mission.objectives[key].done) completedCount++;
+    }
+    missionText = mission.title + ': ' + completedCount + '/' + totalCount + ' objectives';
   }
   
-  $('#legendBox').innerHTML = '<strong>Current Goal:</strong> ' + nextGoal + '<br><code>progress</code> for full details';
+  $('#legendBox').innerHTML = '<strong>Current Mission:</strong> ' + missionText + 
+    '<br>Use <code>mission</code> for details';
 }
 
 function makeChoices(choices) {
@@ -247,25 +244,43 @@ function openShop() {
   function render() {
     content.innerHTML = '<p style="margin-bottom:15px;">Available Credits: <strong>' + gameState.credits + '¢</strong></p>';
     
+    // Check authorization flags
+    var keycardLocked = !gameState._keycardAuthorized;
+    var scannerLocked = !gameState._scannerAuthorized;
+    
     shopItems.forEach(function (it) {
       var owned = gameState.inventory.some(function (i) { return i.id === it.id; });
       var div = document.createElement('div');
       div.className = 'item-card';
       
       var statusText = '';
-      if (owned) {
-        if (it.consumable) {
-          statusText = ' [OWNED - Usable]';
-        } else {
-          statusText = ' [OWNED]';
-        }
+      var isLocked = false;
+      
+      // Check if item is locked
+      if (it.id === 'keycard' && keycardLocked) {
+        isLocked = true;
+        statusText = ' [LOCKED - Need authorization]';
+      } else if (it.id === 'scanner' && scannerLocked) {
+        isLocked = true;
+        statusText = ' [LOCKED - Need authorization]';
+      } else if (owned && !it.consumable) {
+        statusText = ' [OWNED]';
+      } else if (owned && it.consumable) {
+        statusText = ' [OWNED - Can rebuy]';
       }
       
       div.innerHTML = '<h3>' + it.name + statusText + '</h3>' +
                       '<p>' + it.effect + '</p>' +
                       '<p><strong>Price: ' + it.price + '¢</strong></p>';
       
-      // Allow buying consumables multiple times
+      if (isLocked) {
+        div.style.opacity = '0.5';
+        div.style.cursor = 'not-allowed';
+        div.style.borderColor = '#666';
+        content.appendChild(div);
+        return;
+      }
+      
       if (owned && !it.consumable) {
         div.style.opacity = '0.6';
         div.style.cursor = 'default';
@@ -281,17 +296,27 @@ function openShop() {
           playSound('success');
           toast('Purchased', it.name, 'good');
           createParticles(12, div);
+          
+          // ✅ FIX: Check mission purchase objectives
+          var mission = getCurrentMission();
+          if (mission) {
+            for (var key in mission.objectives) {
+              var obj = mission.objectives[key];
+              if (obj.type === 'purchase' && obj.target === it.id) {
+                updateMissionObjective(key);
+                break;
+              }
+            }
+          }
+          
           render();
           updateDisplay();
           
-          // Check progression after purchase
           if (it.id === 'keycard') {
-            hint('Keycard acquired. Use "use keycard" to activate access.');
-            tryUnlockB4();
+            hint('Keycard acquired. Use "use keycard" to activate.');
           }
           if (it.id === 'scanner') {
-            hint('Scanner equipped. Use "use scanner" to detect patterns.');
-            tryUnlockB5();
+            hint('Scanner acquired. Use "use scanner" to detect patterns.');
           }
         } else {
           addLine('Insufficient clearance. Need ' + (it.price - gameState.credits) + '¢ more.', 'error-message');
