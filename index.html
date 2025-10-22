@@ -3,19 +3,22 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<title>NEXUS PROTOCOL — Narrative Extended (v3.7.1)</title>
-<link rel="stylesheet" href="css/styles.css">
+<title>LATTICE DESCENT v2.0</title>
+<link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <div class="glitch-overlay" id="glitchOverlay"></div>
+
+<!-- Loading Screen -->
 <div id="loadingScreen">
-  <div class="loading-text">NEXUS PROTOCOL</div>
+  <div class="loading-text">LATTICE DESCENT</div>
   <div class="loading-bar"><div class="loading-progress" id="loadingBar"></div></div>
-  <div style="margin-top:20px;font-size:12px;">INITIALIZING...</div>
+  <div style="margin-top:20px;font-size:12px;">INITIALIZING REALITY PROTOCOL...</div>
   <div class="load-cta"><button id="forceStart" class="action-btn">START</button></div>
 </div>
 
-<div id="gameContainer" aria-live="polite">
+<!-- Game Container -->
+<div id="gameContainer">
   <div id="header">
     <div class="stats">
       <div class="stat floor-indicator">
@@ -31,7 +34,7 @@
       </div>
       <div class="stat">
         <span class="symbol">¢</span>
-        <span>CLEARANCE:</span> 
+        <span>CREDITS:</span> 
         <span id="credits">100</span>
       </div>
       <div class="stat">
@@ -41,20 +44,14 @@
       </div>
     </div>
     <div class="stats">
-      <button class="action-btn" id="shopBtn" aria-haspopup="dialog">
-        <span class="symbol">📋</span> REQUISITION
-      </button>
-      <button class="action-btn" id="invBtn" aria-haspopup="dialog">
-        <span class="symbol">📦</span> EFFECTS
-      </button>
-      <button class="action-btn" id="soundBtn" title="Toggle sound">🔊</button>
-      <button class="action-btn" id="hudToggle" title="Toggle monitor">
-        <span class="symbol">📊</span> MONITOR
-      </button>
+      <button class="action-btn" id="shopBtn">📋 REQUISITION</button>
+      <button class="action-btn" id="invBtn">📦 EFFECTS</button>
+      <button class="action-btn" id="soundBtn">🔊</button>
+      <button class="action-btn" id="hudToggle">📊 MONITOR</button>
     </div>
   </div>
 
-  <div id="terminal" role="log"></div>
+  <div id="terminal"></div>
 
   <div id="inputArea">
     <span class="prompt">&gt;</span>
@@ -63,32 +60,34 @@
   </div>
 </div>
 
-<div id="shopModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="shopTitle">
+<!-- Shop Modal -->
+<div id="shopModal" class="modal">
   <div class="modal-header">
-    <h2 id="shopTitle">REQUISITION TERMINAL</h2>
-    <span style="cursor:pointer;color:#ff3333;font-size:20px;" id="closeShop" aria-label="Close">✖</span>
+    <h2>REQUISITION TERMINAL</h2>
+    <span class="modal-close" id="closeShop">✖</span>
   </div>
   <div id="shopContent"></div>
 </div>
 
-<div id="inventoryModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="invTitle">
+<!-- Inventory Modal -->
+<div id="inventoryModal" class="modal">
   <div class="modal-header">
-    <h2 id="invTitle">PERSONAL EFFECTS</h2>
-    <span style="cursor:pointer;color:#ff3333;font-size:20px;" id="closeInv" aria-label="Close">✖</span>
+    <h2>PERSONAL EFFECTS</h2>
+    <span class="modal-close" id="closeInv">✖</span>
   </div>
   <div id="inventoryContent"></div>
 </div>
 
-<div id="gameOverModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="goTitle">
-  <div class="modal-header"><h2 id="goTitle">PERMADEATH PROTOCOL</h2></div>
-  <div id="gameOverContent"></div>
+<!-- Diary Modal -->
+<div id="diaryModal" class="modal">
+  <div class="modal-header">
+    <h2>PERSONAL DIARY</h2>
+    <span class="modal-close" id="closeDiary">✖</span>
+  </div>
+  <div id="diaryContent"></div>
 </div>
 
-<div id="winModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="winTitle">
-  <div class="modal-header"><h2 id="winTitle">REVELATION PROTOCOL</h2></div>
-  <div id="winContent"></div>
-</div>
-
+<!-- HUD -->
 <div id="hud">
   <div class="hrow"><span>Coherence</span><span id="hudCoherence">100%</span></div>
   <div class="bar"><span id="barCoherence" style="width:100%"></span></div>
@@ -97,7 +96,7 @@
   <div class="hrow"><span>Truths</span><span id="hudProgress">0</span></div>
   <div class="bar"><span id="barProgress" style="width:0%"></span></div>
   <div class="hrow"><span>Notes</span><span id="hudLogs">0/16</span></div>
-  <div class="hrow"><span>Achievements</span><span id="hudAch">0</span></div>
+  <div class="hrow"><span>Diary</span><span id="hudDiary">0/10</span></div>
   <div class="minimap" id="minimap"></div>
   <div class="ticker" id="ticker"></div>
   <div class="legend" id="legendBox"></div>
@@ -105,12 +104,12 @@
 
 <div id="toasts"></div>
 
-<!-- Scripts in ordine corretto -->
-<script src="js/gameData.js"></script>
-<script src="js/ui.js"></script>
-<script src="js/audio.js"></script>
-<script src="js/gameLogic.js"></script>
-<script src="js/commands.js"></script>
-<script src="js/main.js"></script>
+<!-- Scripts - CRITICAL ORDER -->
+<script src="gameData.js"></script>
+<script src="gameLogic.js"></script>
+<script src="ui.js"></script>
+<script src="audio.js"></script>
+<script src="commands.js"></script>
+<script src="main.js"></script>
 </body>
 </html>
