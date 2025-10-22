@@ -1,6 +1,7 @@
 /* ===========================
-   LATTICE DESCENT - Command Parser v2.0
+   LATTICE DESCENT - Command Parser v2.1 - FIXED
    All game commands and input handling
+   FIX: Aggiunto comando 'search' e migliorato 'touch archives'
    =========================== */
 
 // ============================================
@@ -54,6 +55,8 @@ function processCommand() {
     cmdUse(args);
   } else if (cmd === 'touch' || cmd === 'interact') {
     cmdTouch(args);
+  } else if (cmd === 'search' || cmd === 'examine') {
+    cmdSearch(args);
   } else if (cmd === 'access') {
     cmdAccess(args);
   } else if (cmd === 'clean') {
@@ -97,6 +100,7 @@ function showHelp() {
   addLine('INTERACTION:', 'success-message');
   addLine('  contact [name] - Speak with personnel');
   addLine('  touch [object] - Interact with object');
+  addLine('  search [object] - Search object for items');
   addLine('  use [item] - Use inventory item');
   addLine('  access [terminal] - Access terminal (B5)');
   addLine('');
@@ -143,6 +147,9 @@ function cmdLook(args) {
       addLine('');
       addLine('Objects: ' + Object.keys(room.objects).join(', '), 'hint-message');
       addLine('Directions: north, south, east, west', 'hint-message');
+      
+      // FIX: Automaticamente notifica file disponibili
+      checkAvailableFiles();
     } else {
       addLine('You are in an undefined space.', 'error-message');
     }
@@ -270,7 +277,7 @@ function cmdWork() {
   gameState.coherence = Math.max(0, gameState.coherence - coherenceLoss);
   
   addLine('[Processing paperwork...]', 'system-message');
-  addLine('[+' + earnings + '¢] [-' + coherenceLoss + ' Coherence]', 'success-message');
+  addLine('[+' + earnings + 'Â¢] [-' + coherenceLoss + ' Coherence]', 'success-message');
   
   var messages = [
     'The forms duplicate themselves when you look away.',
@@ -322,7 +329,7 @@ function cmdStatus() {
   addLine('');
   addLine('Floor: ' + gameState.floor + ' (' + gameState.place + ')');
   addLine('Coherence: ' + gameState.coherence + '%');
-  addLine('Credits: ' + gameState.credits + '¢');
+  addLine('Credits: ' + gameState.credits + 'Â¢');
   addLine('Time: ' + formatTime(gameState.time));
   addLine('Truths Discovered: ' + gameState.truths + '/5');
   addLine('');
@@ -354,7 +361,7 @@ function cmdMission() {
   
   for (var key in mission.objectives) {
     var obj = mission.objectives[key];
-    var status = obj.done ? '[✓]' : '[ ]';
+    var status = obj.done ? '[âœ"]' : '[ ]';
     var line = status + ' ' + obj.desc;
     addLine(line, obj.done ? 'success-message' : 'hint-message');
   }
@@ -477,7 +484,7 @@ function cmdUse(args) {
 }
 
 // ============================================
-// TOUCH COMMAND
+// TOUCH COMMAND - FIX: Migliorato per archives
 // ============================================
 
 function cmdTouch(args) {
@@ -496,6 +503,15 @@ function cmdTouch(args) {
   
   addLine('You touch the ' + objectName + '.', 'system-message');
   
+  // FIX: Special interactions for archives
+  if (objectName === 'archives' || objectName === 'shelf') {
+    addLine('The files shift under your touch.', 'thought');
+    addLine('Some documents feel more real than others.', 'thought');
+    checkAvailableFiles();
+    playSound('type');
+    return;
+  }
+  
   // Special interactions
   if (objectName === 'terminal' && !gameState._hasAccessedTerminal) {
     gameState._hasAccessedTerminal = true;
@@ -505,6 +521,48 @@ function cmdTouch(args) {
   } else {
     addLine('Nothing happens. Or maybe it already did.', 'thought');
   }
+}
+
+// ============================================
+// SEARCH COMMAND - NUOVO per trovare file
+// ============================================
+
+function cmdSearch(args) {
+  if (args.length === 0) {
+    addLine('Search what?', 'error-message');
+    return;
+  }
+  
+  var objectName = args.join(' ');
+  var room = getRoomData(gameState.floor, gameState.place);
+  
+  if (!room || !room.objects[objectName]) {
+    addLine('You can\'t search that.', 'error-message');
+    return;
+  }
+  
+  addLine('[Searching ' + objectName + '...]', 'system-message');
+  
+  // Special search for archives/shelf
+  if (objectName === 'archives' || objectName === 'shelf') {
+    addLine('You carefully search through the files.', 'thought');
+    checkAvailableFiles();
+    playSound('type');
+    return;
+  }
+  
+  // Search desk
+  if (objectName === 'desk' && !gameState._hasSearchedDesk) {
+    gameState._hasSearchedDesk = true;
+    addLine('You find old memos and coffee stains.', 'thought');
+    addLine('Nothing useful. Or maybe everything is.', 'thought');
+    playSound('type');
+    return;
+  }
+  
+  // Default
+  addLine('You find nothing of interest.', 'thought');
+  addLine('Or perhaps you weren\'t meant to find it yet.', 'thought');
 }
 
 // ============================================
@@ -635,7 +693,7 @@ function cmdWait() {
 
 function cmdCredits() {
   addLine('═══════════════════════════════════', 'system-message');
-  addLine('  LATTICE DESCENT v2.0', 'system-message');
+  addLine('  LATTICE DESCENT v2.1', 'system-message');
   addLine('═══════════════════════════════════', 'system-message');
   addLine('');
   addLine('A game about patterns, repetition, and descent.', 'thought');

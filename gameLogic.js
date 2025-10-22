@@ -1,6 +1,7 @@
 /* ===========================
-   LATTICE DESCENT - Game Logic v2.0
+   LATTICE DESCENT - Game Logic v2.1 - FIXED
    Mission system, diary unlocking, win/lose conditions
+   FIX: Aggiunta funzione checkAvailableFiles() per notifica automatica file
    =========================== */
 
 // ============================================
@@ -64,7 +65,7 @@ function completeMission(missionId) {
   // Apply rewards
   if (mission.reward.credits) {
     gameState.credits += mission.reward.credits;
-    addLine('[+' + mission.reward.credits + '¢]', 'success-message');
+    addLine('[+' + mission.reward.credits + 'Â¢]', 'success-message');
   }
   
   if (mission.reward.truths) {
@@ -406,6 +407,11 @@ function lookAtObject(objectName) {
       addLine('You find a note in the drawer.', 'hint-message');
       hint('Type "notes" to read it');
     }
+    
+    // FIX: Interazione con archives - notifica file disponibili
+    if (objectName === 'archives' || objectName === 'shelf') {
+      checkAvailableFiles();
+    }
   } else {
     addLine('You don\'t see that here.', 'error-message');
   }
@@ -424,8 +430,30 @@ function lookDirection(direction) {
 }
 
 // ============================================
-// NOTE MANAGEMENT
+// NOTE MANAGEMENT - FIX: Aggiunto sistema di notifica file
 // ============================================
+
+// NUOVA FUNZIONE: Controlla e notifica file disponibili nella location corrente
+function checkAvailableFiles() {
+  var availableFiles = [];
+  
+  for (var noteId in caseFiles) {
+    var note = caseFiles[noteId];
+    if (note.floor === gameState.floor && note.location === gameState.place) {
+      // Verifica se già raccolto
+      var alreadyHas = gameState.notes.some(function(n) { return n.id === noteId; });
+      if (!alreadyHas) {
+        availableFiles.push(noteId);
+      }
+    }
+  }
+  
+  if (availableFiles.length > 0) {
+    addLine('');
+    addLine('[Case files available here: ' + availableFiles.join(', ') + ']', 'hint-message');
+    addLine('Use "read ' + availableFiles[0].toLowerCase() + '" to read a file', 'hint-message');
+  }
+}
 
 function readNote(noteId) {
   var note = caseFiles[noteId];
