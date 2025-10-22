@@ -383,7 +383,7 @@ var caseFiles = {
     id: 'CF-07',
     title: 'Case File CF-07: The Pattern',
     floor: 'B3',
-    location: 'ARCHIVES',
+    location: 'LAB',
     content: [
       '=== CASE FILE CF-07 ===',
       'Date: [REDACTED]',
@@ -841,4 +841,5 @@ var achievements = [
   { id: 'echo_met', name: 'The Listener', desc: 'Meet Echo' },
   { id: 'diary_complete', name: 'Self-Documentation', desc: 'Unlock all diary entries' },
   { id: 'speedrun', name: 'Efficient Gerth', desc: 'Complete the game in under 30 minutes' }
+
 ];
