@@ -5,7 +5,7 @@
 All features from v3.6.0 preserved: deeper English dialogues, investigation/files, choices with consequences, toasts, achievements, progressive floor unlock, multi-step requests, Echo gating, same final
 try here https://lafioritura.github.io/lattice-descent/
 ADDED BINAURAL SOUND ESXPERIENCE FROM B1 TO B5 
-buttons turned alive.
+buttons turned alive..
 Rifinito gameplay con mini tutorial e feedback di fallimento o successo 
 Audio modulato binaurale che muta onde cerebrali a ogni piano in modo diverso. 
 Aggiunta mappa e spazialità osservabile degli ambienti. Interazione e dialoghi. 
